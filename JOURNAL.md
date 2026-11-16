@@ -101,6 +101,10 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 
 ## Historique
 
+### 2026-11-16 — Panneau : défiler ne change plus les réglages
+- Retour de Cyril : en faisant défiler le panneau, le doigt modifiait les curseurs. Désormais un geste vertical fait défiler la liste ; seul un glissement nettement horizontal règle, et la valeur part de là où elle était (elle ne saute plus sous le doigt). Règle dans src/reglages/glisse.ts. 67 tests.
+- En attente : accord de Cyril pour passer le dessin en WebGL (cire lisse en relief, peau d'oreille réaliste).
+
 ### 2026-11-16 — Lots 3, 4 et 5 validés
 - Cyril : « Oui, tout validé ». Il reste le lot 6, qu'il mène lui-même.
 
@@ -156,3 +160,4 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - **Test à l'aveugle** sur la page de test : un bouton « Au hasard » joue un des trois rythmes sans dire lequel, puis le révèle.
 - **Copier le réglage** (prévu au cahier des charges, panneau) : devient très utile avec ~30 curseurs.
 - **Collisions entre morceaux** : aujourd'hui un morceau détaché peut passer par-dessus le reste du bouchon.
+- **Autres instruments** (demande de Cyril, 2026-11-16, « pour plus tard ») : coton-tige, aspirateur d'oreille (l'aspirateur est déjà prévu au cahier des charges avec les variantes : il tire la cire molle et ramasse les miettes).

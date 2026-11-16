@@ -87,7 +87,10 @@ h1 { margin: 0; font-weight: 600; }
 .reglage-haut { display: flex; justify-content: space-between; gap: 12px; }
 .reglage-valeur { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .reglage-interrupteur { flex-direction: row; justify-content: space-between; align-items: center; }
-.reglage input[type='range'] { width: 100%; height: 32px; }
+/* Le doigt sur un curseur : vertical = défiler la liste, horizontal = régler (voir glisse.ts). */
+.reglage-zone { touch-action: pan-y; padding: 6px 0; border-radius: 8px; }
+.reglage-zone.actif { background: rgba(255, 255, 255, 0.06); }
+.reglage input[type='range'] { width: 100%; height: 32px; pointer-events: none; display: block; }
 .reglage input[type='checkbox'] { width: 26px; height: 26px; }
 .panneau-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .reglage-note { color: var(--gris); font-size: 0.8em; }

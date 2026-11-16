@@ -2,6 +2,7 @@
 // Il se construit tout seul à partir du fichier de données : un nouveau réglage
 // ajouté dans defauts.json apparaît ici sans autre code.
 
+import { intention, valeurApresGlisse, type Intention } from './glisse';
 import type { DefinitionReglage, Reglages } from './reglages';
 
 /** Une action proposée en haut du panneau par la page en cours (ex. « Nouveau bouchon »). */
@@ -86,7 +87,7 @@ function ouvrir(reglages: Reglages): void {
 }
 
 function ligne(reglages: Reglages, def: DefinitionReglage): HTMLElement {
-  const bloc = document.createElement('label');
+  const bloc = document.createElement('div');
   bloc.className = 'reglage';
   const nom = document.createElement('span');
   nom.className = 'reglage-nom';
@@ -135,14 +136,43 @@ function ligne(reglages: Reglages, def: DefinitionReglage): HTMLElement {
     valeur.textContent = `${reglages.nombre(def.id)} ${def.unite ?? ''}`;
   };
   afficher();
-  curseur.addEventListener('input', () => {
-    reglages.ecrire(def.id, Number(curseur.value));
+  // Le curseur lui-même ne réagit pas au doigt : c'est sa zone qui décide entre régler et défiler.
+  curseur.tabIndex = -1;
+  const zone = document.createElement('div');
+  zone.className = 'reglage-zone';
+  zone.append(curseur);
+  let doigt: { id: number; x: number; y: number; depart: number; etat: Intention } | null = null;
+  zone.addEventListener('pointerdown', (e) => {
+    doigt = { id: e.pointerId, x: e.clientX, y: e.clientY, depart: reglages.nombre(def.id), etat: 'attendre' };
+  });
+  zone.addEventListener('pointermove', (e) => {
+    if (!doigt || e.pointerId !== doigt.id || doigt.etat === 'defiler') return;
+    const dx = e.clientX - doigt.x;
+    if (doigt.etat === 'attendre') {
+      doigt.etat = intention(dx, e.clientY - doigt.y);
+      if (doigt.etat !== 'glisser') return;
+      try {
+        zone.setPointerCapture(e.pointerId);
+      } catch {
+        /* rien */
+      }
+      zone.classList.add('actif');
+    }
+    const v = valeurApresGlisse(doigt.depart, dx, curseur.clientWidth, def.min, def.max, def.pas);
+    reglages.ecrire(def.id, v);
+    curseur.value = String(reglages.nombre(def.id));
     afficher();
   });
+  const lacher = () => {
+    doigt = null;
+    zone.classList.remove('actif');
+  };
+  zone.addEventListener('pointerup', lacher);
+  zone.addEventListener('pointercancel', lacher);
   const haut = document.createElement('span');
   haut.className = 'reglage-haut';
   haut.append(nom, valeur);
-  bloc.append(haut, curseur);
+  bloc.append(haut, zone);
   return bloc;
 }
 
