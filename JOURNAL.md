@@ -4,9 +4,9 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
-- **Lot en cours :** 1 — Matière brute. Construit, testé automatiquement, mis en ligne.
+- **Lot 1 — Matière brute : VALIDÉ** par Cyril le 2026-11-16. **Prochain : lot 2 (spatule et paroi), en attente du feu vert.**
   - [x] Tirer doucement et tirer fort donnent deux résultats nettement différents (confirmé au doigt par Cyril, 2026-11-16).
-  - [ ] Cyril choisit son mode de commande (pavé tactile ou direct décalé). **En attente.**
+  - [x] Mode de commande choisi : **pavé tactile**. Le mode direct décalé a été retiré du code et du panneau.
 - **Lot 0 :** validé (rythmes sentis et distingués ; Cyril a donné le feu vert pour le lot 1). Ouverture en mode avion jamais confirmée explicitement.
 - **Adresse de test :** https://cyrilretab-maker.github.io/Satisfapp/
 
@@ -53,7 +53,7 @@ Résultats au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) → jama
 - `src/reglages/reglages.ts` : lit le fichier, garde sur le téléphone seulement ce que Cyril a modifié.
 - `src/reglages/panneau.ts` : panneau caché (trois appuis en haut à droite) ; la page en cours peut y ajouter des actions (Nouveau bouchon, Rejouer le même bouchon).
 - `src/matiere/` : **le moteur, sans écran.** `bouchon.ts` fabrique un bouchon à partir d'un numéro de tirage ; `moteur.ts` applique les règles (liens qui cassent au pic, colle du fond qui s'use sous tension modérée, pince) ; `parametres.ts` traduit les réglages pour le moteur.
-- `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (les deux modes de commande), `dessin.ts` (formes grises).
+- `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (pavé tactile), `dessin.ts` (formes grises).
 - `src/pages/` : page de lancement, page du bouchon (`jeu.ts`), page de test vibration et son.
 - `src/sensations/` : couche vibration (remplaçable par Capacitor), couche son, motifs de rythme.
 - `tests/` : tests automatiques (`npm test`). `tests/outils/doigt-simule.ts` = le doigt simulé.
@@ -62,6 +62,9 @@ Résultats au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) → jama
 - La page de jeu expose `window.satisfapp` (simulation en cours) pour les vérifications automatiques.
 
 ## Historique
+
+### 2026-11-16 — Lot 1 validé
+- Cyril confirme au doigt la différence nette entre tirer doucement et tirer fort, et choisit le pavé tactile. Mode direct retiré.
 
 ### 2026-11-16 — Lot 1 construit (matière brute)
 - Moteur de matière : nappe de ~580 points et ~1650 liens, petits pas de temps fixes (même gestes = même résultat).

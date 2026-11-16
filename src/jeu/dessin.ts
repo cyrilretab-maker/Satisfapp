@@ -22,7 +22,7 @@ export function dessiner(ctx: CanvasRenderingContext2D, sim: Simulation, d: Disp
   ctx.fillStyle = COULEURS.page;
   ctx.fillRect(0, 0, d.largeur, d.hauteur);
 
-  if (d.pave) {
+  {
     const p = d.pave;
     ctx.fillStyle = COULEURS.pave;
     ctx.strokeStyle = COULEURS.paveBord;

@@ -9,7 +9,7 @@ import { lireParamsBouchon, lireParamsMatiere } from '../matiere/parametres';
 import type { CoucheSon } from '../sensations/son';
 import { brancherCommande } from '../jeu/commande';
 import { dessiner } from '../jeu/dessin';
-import { disposer, type Disposition, type ModeCommande } from '../jeu/ecran';
+import { disposer, type Disposition } from '../jeu/ecran';
 
 /** Affiche la page et renvoie la fonction qui l'arrête quand on la quitte. */
 export function afficherJeu(racine: HTMLElement, reglages: Reglages, son: CoucheSon): () => void {
@@ -40,7 +40,7 @@ export function afficherJeu(racine: HTMLElement, reglages: Reglages, son: Couche
     toile.style.width = `${l}px`;
     toile.style.height = `${h}px`;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    return disposer(l, h, reglages.texte('commande.mode') as ModeCommande);
+    return disposer(l, h);
   }
 
   function relancer(g: number) {
@@ -59,13 +59,12 @@ export function afficherJeu(racine: HTMLElement, reglages: Reglages, son: Couche
     toile,
     () => sim,
     () => dispo,
-    () => ({ sensibilite: reglages.nombre('commande.sensibilite'), decalage: reglages.nombre('commande.decalage') }),
+    () => reglages.nombre('commande.sensibilite'),
   );
 
   // Chaque curseur agit tout de suite sur le bouchon en cours.
-  const arreterEcoute = reglages.surChangement((id) => {
+  const arreterEcoute = reglages.surChangement(() => {
     sim.params = lireParamsMatiere(reglages);
-    if (id === 'commande.mode') dispo = mettreEnPage();
   });
   const surRedimension = () => (dispo = mettreEnPage());
   window.addEventListener('resize', surRedimension);

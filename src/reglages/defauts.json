@@ -14,9 +14,7 @@
     { "id": "general.son", "groupe": "general", "libelle": "Son", "type": "interrupteur", "valeur": true },
     { "id": "general.volume", "groupe": "general", "libelle": "Volume du son", "type": "curseur", "min": 0, "max": 100, "pas": 5, "unite": "%", "valeur": 60 },
 
-    { "id": "commande.mode", "groupe": "commande", "libelle": "Mode de commande", "type": "choix", "options": [{ "valeur": "pave", "libelle": "Pavé tactile" }, { "valeur": "direct", "libelle": "Direct décalé" }], "valeur": "pave" },
     { "id": "commande.sensibilite", "groupe": "commande", "libelle": "Pavé : vitesse de l'outil pour un même glissé du pouce", "type": "curseur", "min": 0.3, "max": 4, "pas": 0.1, "unite": "×", "valeur": 1.2 },
-    { "id": "commande.decalage", "groupe": "commande", "libelle": "Direct : hauteur de l'outil au-dessus du doigt", "type": "curseur", "min": 0, "max": 160, "pas": 5, "unite": "px", "valeur": 70 },
     { "id": "geste.force", "groupe": "commande", "libelle": "Force du geste (traction pour un même déplacement)", "type": "curseur", "min": 0.5, "max": 200, "pas": 1, "valeur": 80},
     { "id": "outil.inertie", "groupe": "commande", "libelle": "Retard de l'outil quand il ne tient rien", "type": "curseur", "min": 0, "max": 300, "pas": 10, "unite": "ms", "valeur": 40 },
 

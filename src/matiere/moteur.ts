@@ -145,7 +145,7 @@ export class Simulation {
     this.outil.cibleY = cy * k;
   }
 
-  /** Place l'outil d'un coup (mode direct, quand le doigt se pose). */
+  /** Place l'outil d'un coup (sert au doigt simulé des tests). */
   placerOutil(cx: number, cy: number): void {
     this.definirCible(cx, cy);
     if (!this.outil.ferme) {
