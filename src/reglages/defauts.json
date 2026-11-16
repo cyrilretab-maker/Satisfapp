@@ -10,11 +10,11 @@
     { "id": "general.volume", "groupe": "general", "libelle": "Volume du son", "type": "curseur", "min": 0, "max": 100, "pas": 5, "unite": "%", "valeur": 60 },
 
     { "id": "rythmes.duree", "groupe": "rythmes", "libelle": "Durée d'un essai", "type": "curseur", "min": 1000, "max": 8000, "pas": 250, "unite": "ms", "valeur": 3000 },
-    { "id": "rythmes.lent.pulsation", "groupe": "rythmes", "libelle": "Lent : durée d'une pulsation", "type": "curseur", "min": 10, "max": 400, "pas": 5, "unite": "ms", "valeur": 70 },
+    { "id": "rythmes.lent.pulsation", "groupe": "rythmes", "libelle": "Lent : durée d'une pulsation", "type": "curseur", "min": 10, "max": 400, "pas": 5, "unite": "ms", "valeur": 300 },
     { "id": "rythmes.lent.pause", "groupe": "rythmes", "libelle": "Lent : pause entre deux pulsations", "type": "curseur", "min": 20, "max": 1500, "pas": 10, "unite": "ms", "valeur": 650 },
-    { "id": "rythmes.moyen.pulsation", "groupe": "rythmes", "libelle": "Moyen : durée d'une pulsation", "type": "curseur", "min": 10, "max": 400, "pas": 5, "unite": "ms", "valeur": 50 },
+    { "id": "rythmes.moyen.pulsation", "groupe": "rythmes", "libelle": "Moyen : durée d'une pulsation", "type": "curseur", "min": 10, "max": 400, "pas": 5, "unite": "ms", "valeur": 150 },
     { "id": "rythmes.moyen.pause", "groupe": "rythmes", "libelle": "Moyen : pause entre deux pulsations", "type": "curseur", "min": 20, "max": 1500, "pas": 10, "unite": "ms", "valeur": 250 },
-    { "id": "rythmes.rapide.pulsation", "groupe": "rythmes", "libelle": "Rapide : durée d'une pulsation", "type": "curseur", "min": 10, "max": 400, "pas": 5, "unite": "ms", "valeur": 35 },
-    { "id": "rythmes.rapide.pause", "groupe": "rythmes", "libelle": "Rapide : pause entre deux pulsations", "type": "curseur", "min": 20, "max": 1500, "pas": 10, "unite": "ms", "valeur": 80 }
+    { "id": "rythmes.rapide.pulsation", "groupe": "rythmes", "libelle": "Rapide : durée d'une pulsation", "type": "curseur", "min": 10, "max": 400, "pas": 5, "unite": "ms", "valeur": 80 },
+    { "id": "rythmes.rapide.pause", "groupe": "rythmes", "libelle": "Rapide : pause entre deux pulsations", "type": "curseur", "min": 20, "max": 1500, "pas": 10, "unite": "ms", "valeur": 120 }
   ]
 }

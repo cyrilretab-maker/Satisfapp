@@ -4,26 +4,26 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
-- **Lot en cours :** 0 — Socle technique. Code terminé et vérifié sur l'ordinateur. **En attente :** création du dépôt GitHub par Cyril, puis test sur le téléphone.
-- **Décisions prises :** code public, hébergement de test sur GitHub Pages (2026-11-16).
-- **Réglages retenus :** aucun pour l'instant (valeurs de départ ci-dessous).
+- **Lot en cours :** 0 — Socle technique. Rythmes sentis et distingués au doigt. **Reste à confirmer :** ouverture en mode avion. Ensuite : feu vert de Cyril pour le lot 1.
+- **Décisions prises :** code public, hébergement de test sur GitHub Pages (2026-11-16). Vibration web conservée pour l'instant (elle se sent avec des pulsations longues).
+- **Leçon vibration :** la vibration web n'a pas de force réglable. Une pulsation de moins de ~100 ms est trop faible pour être sentie sur le téléphone de Cyril : la tension devra jouer surtout sur les pauses, avec des pulsations assez longues.
 
-### Valeurs de départ des rythmes de test (fichier `src/reglages/defauts.json`)
+### Rythmes retenus (fichier `src/reglages/defauts.json`, depuis le 2026-11-16)
 
 | Rythme | Pulsation | Pause | Pulsations par seconde |
 | --- | --- | --- | --- |
-| Lent | 70 ms | 650 ms | ≈ 1,4 |
-| Moyen | 50 ms | 250 ms | ≈ 3,3 |
-| Rapide | 35 ms | 80 ms | ≈ 8,7 |
+| Lent | 300 ms | 650 ms | ≈ 1,05 |
+| Moyen | 150 ms | 250 ms | ≈ 2,5 |
+| Rapide | 80 ms | 120 ms | ≈ 5 |
 
-Durée d'un essai : 3000 ms. Volume : 60 %.
+Anciennes valeurs (trop faibles, non senties) : 70/650, 50/250, 35/80. Durée d'un essai : 3000 ms. Volume : 60 %.
 
 ## Ce qui reste pour valider le lot 0
 
 - [x] Dépôt GitHub `cyrilretab-maker/Satisfapp` créé (public) et code envoyé.
 - [x] GitHub Pages activé, adresse de test : https://cyrilretab-maker.github.io/Satisfapp/
-- [ ] App installée sur le téléphone, ouverte en mode avion.
-- [ ] Cyril distingue les trois rythmes.
+- [ ] App installée sur le téléphone, ouverte en mode avion (installée : oui ; mode avion : à confirmer).
+- [x] Cyril distingue et sent les trois rythmes (après allongement des pulsations).
 
 ### Premier retour de Cyril (2026-11-16)
 - App en ligne et installée. Les trois rythmes se distinguent (au son), **mais la vibration est si faible qu'on ne la sent pas**.
