@@ -81,6 +81,11 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 
 ## Historique
 
+### 2026-11-16 — Retour de Cyril sur le lot 2
+- « La spatule ne fait rien » : vérifié par le vrai chemin du pouce, elle agit, mais seulement à portée d'un point d'entrée, sans aucun signe visible. Corrections : portée 0,07 → 0,1 ; points d'entrée 3 → 4 points ; colle du tour 0,12 → 0,06 ; **la matière pâlit progressivement à mesure que sa colle s'use** (7 nuances de gris), pour voir la spatule travailler.
+- « Je n'aime pas que ça casse en fil » : nouvelle règle **cassure nette** par défaut (un lien qui ne borde plus aucune surface casse aussi). Réglage « En se déchirant, la cire laisse des fils » (coupé), à rallumer pour la variante chewing-gum.
+- 47 tests.
+
 ### 2026-11-16 — Lot 2 construit (spatule et paroi)
 - Bouchon : tour collé à la paroi, 2 points d'entrée de 3 points. Spatule et pince au choix (deux boutons sous la vue). Repli en sac. Paroi sensible avec vibration, sursaut et rougeur.
 - 45 tests automatiques (dont tour, spatule, repli, paroi).

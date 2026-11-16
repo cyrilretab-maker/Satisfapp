@@ -9,8 +9,8 @@ const COULEURS = {
   fond: '#3b3b3b', // le fond du conduit, derrière le bouchon
   paroi: '#4a4a4a', // la paroi du conduit, tout autour
   bordVue: '#111',
-  // Matière, de « collée partout » (foncé) à « décollée » (clair)
-  matiere: ['#8a8a8a', '#959595', '#a2a2a2', '#b0b0b0'],
+  // Matière, de « collée partout » (foncé) à « décollée » (clair), en 7 nuances
+  matiere: ['#8a8a8a', '#909090', '#979797', '#9d9d9d', '#a3a3a3', '#aaaaaa', '#b0b0b0'],
   fil: '#a8a8a8',
   outil: '#e8e8e8',
   outilFerme: '#ffffff',
@@ -80,7 +80,8 @@ export function dessiner(
   const X = (i: number) => cx + sim.x[i] * R;
   const Y = (i: number) => cy + sim.y[i] * R;
   const b = sim.b;
-  const tient = (i: number) => (sim.estLibre(i) ? 0 : 1);
+  // Ce qui reste de colle à chaque point (1 = intacte, 0 = libre) : la matière pâlit à mesure qu'elle s'use.
+  const tient = (i: number) => (sim.colleAuTour[i] ? sim.santeTour[i] : sim.colleAuFond[i] ? sim.sante[i] : 0);
 
   // Triangles de matière, regroupés par teinte (selon combien de leurs coins tiennent encore).
   const chemins = COULEURS.matiere.map(() => new Path2D());
@@ -90,7 +91,7 @@ export function dessiner(
     const c = b.triangles[3 * t + 1];
     const e = b.triangles[3 * t + 2];
     if (sim.sorti[a] || sim.sorti[c] || sim.sorti[e] || !sim.triangleIntact(t)) continue;
-    const ch = chemins[3 - (tient(a) + tient(c) + tient(e))];
+    const ch = chemins[Math.round(((3 - (tient(a) + tient(c) + tient(e))) / 3) * 6)];
     ch.moveTo(X(a), Y(a));
     ch.lineTo(X(c), Y(c));
     ch.lineTo(X(e), Y(e));

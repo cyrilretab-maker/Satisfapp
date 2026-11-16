@@ -40,6 +40,7 @@ export interface ParamsMatiere {
   forceGeste: number; // force de traction par unité de distance entre le pouce et la prise
   inertieOutil: number; // secondes de retard de l'outil quand il ne tient rien
   sousPas: number; // nombre de petits pas de calcul par image
+  filsDeCire: boolean; // en se déchirant, la cire laisse des fils (sinon : cassure nette)
 }
 
 export type Evenement =
@@ -340,12 +341,24 @@ export class Simulation {
     const b = this.b;
     for (let l = 0; l < b.lienA.length; l++) {
       if (!this.lienOk[l]) continue;
-      if (this.allongement(l) > this.limite(l)) {
-        this.lienOk[l] = 0;
-        this.morceauxAJour = false;
-        this.evenements.push({ type: 'lienCasse', lien: l });
+      if (this.allongement(l) > this.limite(l)) this.casser(l);
+    }
+    if (!this.params.filsDeCire) {
+      // Cassure nette : un lien qui ne borde plus aucune surface intacte (un fil) casse aussi.
+      for (let l = 0; l < b.lienA.length; l++) {
+        if (!this.lienOk[l]) continue;
+        const t1 = b.lienTriangles[2 * l];
+        const t2 = b.lienTriangles[2 * l + 1];
+        if (t1 < 0) continue;
+        if (!this.triangleIntact(t1) && (t2 < 0 || !this.triangleIntact(t2))) this.casser(l);
       }
     }
+  }
+
+  private casser(l: number): void {
+    this.lienOk[l] = 0;
+    this.morceauxAJour = false;
+    this.evenements.push({ type: 'lienCasse', lien: l });
   }
 
   /** Tension tenue dans le temps : la colle du fond s'use, puis lâche. */

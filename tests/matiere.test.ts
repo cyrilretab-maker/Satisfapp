@@ -286,3 +286,37 @@ describe('La paroi sensible', () => {
     expect(sim.lienOk.every((l) => l === 1)).toBe(true);
   });
 });
+
+describe('Cassure nette et spatule imprécise', () => {
+  const fils = (sim: Simulation) => {
+    let k = 0;
+    for (let l = 0; l < sim.b.lienA.length; l++) {
+      if (!sim.lienOk[l] || sim.sorti[sim.b.lienA[l]] || sim.sorti[sim.b.lienB[l]]) continue;
+      const t1 = sim.b.lienTriangles[2 * l];
+      const t2 = sim.b.lienTriangles[2 * l + 1];
+      if (t1 >= 0 && !sim.triangleIntact(t1) && (t2 < 0 || !sim.triangleIntact(t2))) k++;
+    }
+    return k;
+  };
+
+  it('par défaut, la cire casse net : aucun fil ne reste après une déchirure', () => {
+    for (const g of [1, 2, 3]) {
+      const { sim } = partie(g, FORT);
+      expect(sim.lienOk.length - compter(sim.lienOk)).toBeGreaterThan(0);
+      expect(fils(sim)).toBe(0);
+    }
+  });
+
+  it('la spatule décolle le tour même si la pointe est un peu à côté du bord', () => {
+    for (const ecart of [-0.05, 0.05]) {
+      const sim = nouvelleSimulation(1);
+      const a = angleDEntree(sim);
+      const i = pointDuBord(sim, a + 0.12); // juste à côté du point d'entrée
+      const r = Math.hypot(sim.x[i], sim.y[i]) + ecart;
+      const ang = Math.atan2(sim.y[i], sim.x[i]);
+      const avant = sim.tourRestant();
+      frotter(sim, Math.cos(ang) * r, Math.sin(ang) * r, 4);
+      expect(sim.tourRestant()).toBeLessThan(avant);
+    }
+  });
+});

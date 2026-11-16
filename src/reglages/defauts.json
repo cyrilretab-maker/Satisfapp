@@ -24,12 +24,13 @@
     { "id": "matiere.solidite", "groupe": "matiere", "libelle": "Solidité de la cire (force pour la déchirer)", "type": "curseur", "min": 0.1, "max": 5, "pas": 0.05, "valeur": 1 },
     { "id": "matiere.elasticite", "groupe": "matiere", "libelle": "Élasticité (allongement avant rupture)", "type": "curseur", "min": 5, "max": 200, "pas": 5, "unite": "%", "valeur": 60 },
     { "id": "matiere.amortissement", "groupe": "matiere", "libelle": "Amortissement (la matière s'agite moins)", "type": "curseur", "min": 0, "max": 40, "pas": 0.5, "valeur": 2},
+    { "id": "matiere.fils", "groupe": "matiere", "libelle": "En se déchirant, la cire laisse des fils (sinon cassure nette)", "type": "interrupteur", "valeur": false },
 
     { "id": "colle.duree", "groupe": "colle", "libelle": "Temps de tension pour décoller un point", "type": "curseur", "min": 0.02, "max": 5, "pas": 0.01, "unite": "s", "valeur": 0.1},
     { "id": "colle.seuil", "groupe": "colle", "libelle": "Tension minimale qui décolle (part de la solidité)", "type": "curseur", "min": 1, "max": 95, "pas": 1, "unite": "%", "valeur": 2},
     { "id": "colle.raideur", "groupe": "colle", "libelle": "Raideur de la colle (la matière collée bouge moins)", "type": "curseur", "min": 1, "max": 200, "pas": 1, "valeur": 40},
     { "id": "colle.direction", "groupe": "colle", "libelle": "Changer de direction accélère le décollement", "type": "curseur", "min": 0, "max": 10, "pas": 0.5, "unite": "×", "valeur": 3 },
-    { "id": "tour.colle", "groupe": "tour", "libelle": "Colle du tour : frottement de spatule pour décoller un point", "type": "curseur", "min": 0.01, "max": 1, "pas": 0.01, "valeur": 0.12 },
+    { "id": "tour.colle", "groupe": "tour", "libelle": "Colle du tour : frottement de spatule pour décoller un point", "type": "curseur", "min": 0.01, "max": 1, "pas": 0.01, "valeur": 0.06 },
     { "id": "tour.repli", "groupe": "tour", "libelle": "Repli : force avec laquelle un bord décollé se rétracte", "type": "curseur", "min": 0, "max": 5, "pas": 0.1, "valeur": 0.5 },
     { "id": "tour.repliDistance", "groupe": "tour", "libelle": "Repli : jusqu'où le bord se rétracte", "type": "curseur", "min": 0, "max": 0.4, "pas": 0.01, "valeur": 0.1 },
 
@@ -39,7 +40,7 @@
     { "id": "pince.fragilite", "groupe": "pince", "libelle": "Prise sur zone collée : solidité restante (miette)", "type": "curseur", "min": 5, "max": 100, "pas": 5, "unite": "%", "valeur": 25 },
     { "id": "pince.renfort", "groupe": "pince", "libelle": "Cire tenue dans la pince : résiste mieux (pliée)", "type": "curseur", "min": 1, "max": 5, "pas": 0.25, "unite": "×", "valeur": 3},
     { "id": "pince.zonePliee", "groupe": "pince", "libelle": "Zone renforcée autour de la prise", "type": "curseur", "min": 1, "max": 4, "pas": 0.25, "unite": "×", "valeur": 2 },
-    { "id": "spatule.rayon", "groupe": "spatule", "libelle": "Portée de la pointe", "type": "curseur", "min": 0.02, "max": 0.2, "pas": 0.005, "valeur": 0.07 },
+    { "id": "spatule.rayon", "groupe": "spatule", "libelle": "Portée de la pointe", "type": "curseur", "min": 0.02, "max": 0.2, "pas": 0.005, "valeur": 0.1 },
     { "id": "spatule.mouvement", "groupe": "spatule", "libelle": "Vitesse minimale pour agir (l'appui immobile ne fait rien)", "type": "curseur", "min": 0.02, "max": 1, "pas": 0.02, "valeur": 0.1 },
     { "id": "paroi.marge", "groupe": "paroi", "libelle": "Marge de la paroi (précision exigée avant de toucher la peau)", "type": "curseur", "min": 0, "max": 0.2, "pas": 0.005, "valeur": 0.08 },
     { "id": "paroi.vibration", "groupe": "paroi", "libelle": "Contact : vibration brève", "type": "curseur", "min": 0, "max": 300, "pas": 10, "unite": "ms", "valeur": 110 },
@@ -55,7 +56,7 @@
     { "id": "bouchon.colleesIntensite", "groupe": "bouchon", "libelle": "Zones très collées : la colle y dure", "type": "curseur", "min": 1, "max": 6, "pas": 0.5, "unite": "×", "valeur": 2.5, "prochainBouchon": true },
     { "id": "bouchon.irregulariteCire", "groupe": "bouchon", "libelle": "Irrégularité de la cire (solidité d'un lien à l'autre)", "type": "curseur", "min": 0, "max": 50, "pas": 5, "unite": "%", "valeur": 15, "prochainBouchon": true },
     { "id": "bouchon.entreesNombre", "groupe": "bouchon", "libelle": "Points d'entrée : nombre", "type": "curseur", "min": 0, "max": 4, "pas": 1, "valeur": 2, "prochainBouchon": true },
-    { "id": "bouchon.entreesTaille", "groupe": "bouchon", "libelle": "Points d'entrée : taille (points du bord)", "type": "curseur", "min": 1, "max": 8, "pas": 1, "valeur": 3, "prochainBouchon": true },
+    { "id": "bouchon.entreesTaille", "groupe": "bouchon", "libelle": "Points d'entrée : taille (points du bord)", "type": "curseur", "min": 1, "max": 8, "pas": 1, "valeur": 4, "prochainBouchon": true },
 
     { "id": "rythmes.duree", "groupe": "rythmes", "libelle": "Durée d'un essai", "type": "curseur", "min": 1000, "max": 8000, "pas": 250, "unite": "ms", "valeur": 3000 },
     { "id": "rythmes.lent.pulsation", "groupe": "rythmes", "libelle": "Lent : durée d'une pulsation", "type": "curseur", "min": 10, "max": 400, "pas": 5, "unite": "ms", "valeur": 300 },

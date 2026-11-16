@@ -29,6 +29,7 @@ export function lireParamsMatiere(r: Reglages): ParamsMatiere {
     forceGeste: r.nombre('geste.force'),
     inertieOutil: r.nombre('outil.inertie') / 1000,
     sousPas: 8,
+    filsDeCire: r.oui('matiere.fils'),
   };
 }
 
