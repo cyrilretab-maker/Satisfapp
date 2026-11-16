@@ -29,7 +29,9 @@ export function afficherTestVibration(
       }</p>
       <div class="rythmes"></div>
       <button class="arret">Arrêter</button>
+      <p class="etat diagnostic"></p>
     </section>`;
+  const diagnostic = racine.querySelector<HTMLElement>('.diagnostic')!;
 
   const arreter = () => {
     vibration.arreter();
@@ -50,7 +52,14 @@ export function afficherTestVibration(
         reglages.nombre('rythmes.duree'),
       );
       arreter();
-      if (reglages.oui('general.vibration')) vibration.jouer(motif);
+      // Diagnostic : dire si le navigateur a accepté ou refusé la vibration.
+      if (!reglages.oui('general.vibration')) {
+        diagnostic.textContent = 'Vibration coupée dans les réglages.';
+      } else if (vibration.jouer(motif)) {
+        diagnostic.textContent = `${r.nom} : le navigateur a accepté la vibration (${(motif.length + 1) / 2} pulsations).`;
+      } else {
+        diagnostic.textContent = `${r.nom} : le navigateur a REFUSÉ la vibration.`;
+      }
       if (reglages.oui('general.son')) {
         son.jouerTics(debutsDesPulsations(motif), reglages.nombre('general.volume') / 100);
       }

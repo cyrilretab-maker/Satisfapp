@@ -3,7 +3,8 @@
 
 export interface CoucheVibration {
   readonly disponible: boolean;
-  jouer(motif: number[]): void;
+  /** Renvoie false si le navigateur refuse la demande. */
+  jouer(motif: number[]): boolean;
   arreter(): void;
 }
 
@@ -12,7 +13,7 @@ export function creerVibrationWeb(): CoucheVibration {
   return {
     disponible,
     jouer(motif) {
-      if (disponible) navigator.vibrate(motif);
+      return disponible ? navigator.vibrate(motif) : false;
     },
     arreter() {
       if (disponible) navigator.vibrate(0);
