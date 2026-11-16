@@ -115,6 +115,7 @@ export function dessinerMorceau(
     }
     return;
   }
+  // La forme : les triangles, plus un petit disque par point (bords ronds, pas de fentes).
   const chemin = new Path2D();
   for (let t = 0; t < m.tris.length; t += 3) {
     for (let k = 0; k < 3; k++) {
@@ -126,9 +127,32 @@ export function dessinerMorceau(
     }
     chemin.closePath();
   }
-  ctx.fill(chemin);
-  ctx.stroke(chemin);
+  const rp = RAYON_POINT * echelle;
+  for (let k = 0; k < m.pts.length; k += 2) {
+    const px = x + m.pts[k] * echelle;
+    const py = y + m.pts[k + 1] * echelle;
+    chemin.moveTo(px + rp, py);
+    chemin.arc(px, py, rp, 0, Math.PI * 2);
+  }
+  // Un peu de volume : plus clair au milieu, bord plus sombre, un reflet mouillé.
+  const r = rayonDuMorceau(m) * echelle;
+  const degrade = ctx.createRadialGradient(x - r * 0.25, y - r * 0.3, 0, x, y, r * 1.1);
+  degrade.addColorStop(0, '#f0c46a');
+  degrade.addColorStop(0.55, couleur);
+  degrade.addColorStop(1, '#7c4f17');
+  ctx.fillStyle = degrade;
+  ctx.fill(chemin, 'nonzero');
+  ctx.save();
+  ctx.clip(chemin);
+  ctx.fillStyle = 'rgba(255, 248, 225, 0.35)';
+  ctx.beginPath();
+  ctx.ellipse(x - r * 0.3, y - r * 0.35, r * 0.28, r * 0.12, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
+
+/** Rayon d'un point de matière autour de lui (unités de vue), comme dans le jeu. */
+const RAYON_POINT = 0.036;
 
 /** Rayon d'un morceau (unités de vue), pour le mettre à l'échelle. */
 export function rayonDuMorceau(m: MorceauGarde): number {

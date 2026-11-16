@@ -32,6 +32,9 @@ export interface OptionsDessin {
   dureeRougeur: number; // secondes
   sursaut: number; // amplitude en pixels (0 = coupé)
   blanchiment: number; // part de l'étirement maximal à partir de laquelle la cire blanchit
+  /** Vrai quand la peau et la cire sont déjà dessinées par la puce graphique (rendu-gl.ts) :
+   * on ne dessine alors que ce qui vient par-dessus (outils, bord de la vue, zone du pouce). */
+  parDessus?: boolean;
 }
 
 export function dessiner(
@@ -45,14 +48,53 @@ export function dessiner(
   const [sx, sy] = peau.sursaut(o.temps, o.sursaut);
   const cx = d.cx + sx;
   const cy = d.cy + sy;
-  ctx.fillStyle = COULEURS.page;
-  ctx.fillRect(0, 0, d.largeur, d.hauteur);
+  if (o.parDessus) {
+    ctx.clearRect(0, 0, d.largeur, d.hauteur);
+  } else {
+    ctx.fillStyle = COULEURS.page;
+    ctx.fillRect(0, 0, d.largeur, d.hauteur);
+  }
   dessinerPave(ctx, d);
 
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.clip();
+  if (!o.parDessus) dessinerPeauEtCire(ctx, sim, peau, o, cx, cy, R);
+
+  // 8. L'outil, éclairé par la caméra (position lissée entre deux pas de calcul).
+  const a = sim.fractionDePas();
+  const ox = cx + (sim.outilAvant.x + (sim.outil.x - sim.outilAvant.x) * a) * R;
+  const oy = cy + (sim.outilAvant.y + (sim.outil.y - sim.outilAvant.y) * a) * R;
+  if (sim.outil.type === 'spatule') dessinerSpatule(ctx, ox, oy, R);
+  else dessinerPince(ctx, ox, oy, sim.outil.ferme, R);
+
+  // 9. Le bord sombre de l'endoscope (vignettage).
+  const vignette = ctx.createRadialGradient(cx, cy, R * 0.62, cx, cy, R);
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(0.75, 'rgba(0, 0, 0, 0.35)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = COULEURS.bordVue;
+  ctx.lineWidth = 5;
+  ctx.stroke();
+}
+
+/** Le dessin simple (Canvas 2D) de la peau et de la cire : sert quand la puce graphique n'est pas disponible. */
+function dessinerPeauEtCire(
+  ctx: CanvasRenderingContext2D,
+  sim: Simulation,
+  peau: Peau,
+  o: OptionsDessin,
+  cx: number,
+  cy: number,
+  R: number,
+): void {
 
   // 1. La peau du conduit : sombre au fond, claire sur la paroi.
   const peauDegrade = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
@@ -193,27 +235,6 @@ export function dessiner(
     ctx.fill();
   }
   ctx.restore();
-
-  // 8. L'outil, éclairé par la caméra.
-  const ox = cx + sim.outil.x * R;
-  const oy = cy + sim.outil.y * R;
-  if (sim.outil.type === 'spatule') dessinerSpatule(ctx, ox, oy, R);
-  else dessinerPince(ctx, ox, oy, sim.outil.ferme, R);
-
-  // 9. Le bord sombre de l'endoscope (vignettage).
-  const vignette = ctx.createRadialGradient(cx, cy, R * 0.62, cx, cy, R);
-  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vignette.addColorStop(0.75, 'rgba(0, 0, 0, 0.35)');
-  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
-  ctx.fillStyle = vignette;
-  ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
-  ctx.restore();
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.strokeStyle = COULEURS.bordVue;
-  ctx.lineWidth = 5;
-  ctx.stroke();
 }
 
 function dessinerPave(ctx: CanvasRenderingContext2D, d: Disposition): void {

@@ -4,7 +4,8 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
-- **Prochaine étape : lot 6 (essai en situation réelle, mené par Cyril lui-même).** Rien à construire avant son retour.
+- **En cours : V2 « réalisme et fluidité » (demande de Cyril, 2026-11-16).** Dessin par la puce graphique (WebGL 2) construit et en ligne : en attente de son avis à l'œil sur le téléphone.
+- **Lot 6 (essai en situation réelle) :** mené par Cyril lui-même.
 - **Lots 3, 4 et 5 — Tension, habillage, bocal : VALIDÉS** par Cyril le 2026-11-16.
   - [x] Lot 3 : Cyril sent venir la casse les yeux fermés (au doigt simulé : les pulsations commencent plus d'une seconde avant la première déchirure, sur 4 bouchons).
   - [x] Lot 4 : l'écran rappelle les captures de référence, sans paraître sale ni choquant.
@@ -91,15 +92,25 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - `src/reglages/reglages.ts` : lit le fichier, garde sur le téléphone seulement ce que Cyril a modifié.
 - `src/reglages/panneau.ts` : panneau caché (trois appuis en haut à droite) ; la page en cours peut y ajouter des actions (Nouveau bouchon, Rejouer le même bouchon).
 - `src/matiere/` : **le moteur, sans écran.** `bouchon.ts` fabrique un bouchon à partir d'un numéro de tirage ; `moteur.ts` applique les règles (liens qui cassent au pic, colle du fond qui s'use sous tension modérée, colle du tour, spatule, pince, repli, paroi) ; `parametres.ts` traduit les réglages pour le moteur.
-- `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (pavé tactile), `dessin.ts` (habillage), `peau.ts` (rougeurs et sursaut), `bocal.ts` (bocal), `sortie.ts` (morceaux qui volent vers le bocal), `sauvegarde.ts` (reprise de partie).
+- `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (pavé tactile), `rendu-gl.ts` (dessin réaliste par la puce graphique : peau et cire), `bruit.ts` (texture de grain), `dessin.ts` (outils, bord de la vue, zone du pouce ; et dessin simple de secours), `peau.ts` (rougeurs et sursaut), `bocal.ts` (bocal), `sortie.ts` (morceaux qui volent vers le bocal), `sauvegarde.ts` (reprise de partie).
 - `src/pages/` : page de lancement, page du bouchon (`jeu.ts`), page de test vibration et son.
 - `src/sensations/` : couche vibration (remplaçable par Capacitor), `tension.ts` (pilote : pulsations, craquements, silences), `sons-matiere.ts` (sons fabriqués), `parametres-sensations.ts`, motifs de rythme du lot 0.
 - `tests/` : tests automatiques (`npm test`). `tests/outils/doigt-simule.ts` = le doigt simulé.
 - `.github/workflows/publier.yml` : à chaque envoi sur `main`, tests, puis construction et mise en ligne.
-- Outils : Vite 8, TypeScript 7, Vitest 5, vite-plugin-pwa 2. Pas de PixiJS (dessin Canvas 2D).
+- Outils : Vite 8, TypeScript 7, Vitest 5, vite-plugin-pwa 2. Pas de PixiJS. Peau et cire en WebGL 2 (accord de Cyril, 2026-11-16), le reste en Canvas 2D ; si WebGL 2 manque ou lâche, tout repasse en Canvas 2D.
 - La page de jeu expose `window.satisfapp` (simulation en cours) pour les vérifications automatiques.
 
 ## Historique
+
+### 2026-11-16 — V2 : dessin réaliste par la puce graphique (WebGL)
+- Demande de Cyril : « passer de ces petits losanges à une texture plus réaliste comme une oreille », et plus de fluidité. Il a accepté le passage à WebGL.
+- **Cire** : chaque point et chaque triangle sont peints dans une image cachée, floutée, puis découpée : une masse lisse et ronde, sans facettes. Relief (bords bombés) tiré de cette masse, bosses et grain qui bougent avec la cire, reflets mouillés de la lumière de l'endoscope, cire plus claire et un peu transparente là où elle est fine, ombre sur la peau. Les couleurs gardent le sens de la colle (ambre foncé = collée, miel = décollée) et le blanchiment avant la casse.
+- **Peau** : tunnel sombre au fond, plis dans le sens du conduit, grain, pores, éclat humide ; la peau dégagée s'éclaircit.
+- **Fluidité** : l'image glisse entre deux pas de calcul (utile sur les écrans 90/120 Hz) ; dessin ≈ 0,3 ms par image sur ordinateur.
+- **Réglages ajoutés (groupe Image)** : dessin réaliste oui/non, douceur du contour, relief, bosses et grain, force et finesse des reflets, transparence, grain et plis de la peau, ombre, finesse du dessin (à baisser si ça saccade).
+- Le morceau qui vole vers le bocal (et le bocal) : bords ronds, dégradé et reflet, au lieu des triangles plats.
+- Panneau : faire défiler la liste ne change plus les réglages (voir entrée plus bas).
+- 69 tests.
 
 ### 2026-11-16 — Panneau : défiler ne change plus les réglages
 - Retour de Cyril : en faisant défiler le panneau, le doigt modifiait les curseurs. Désormais un geste vertical fait défiler la liste ; seul un glissement nettement horizontal règle, et la valeur part de là où elle était (elle ne saute plus sous le doigt). Règle dans src/reglages/glisse.ts. 67 tests.

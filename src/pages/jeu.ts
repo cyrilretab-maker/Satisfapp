@@ -15,6 +15,7 @@ import { Bocal, dessinerMorceau, formeDuMorceau, rayonDuMorceau } from '../jeu/b
 import { brancherCommande } from '../jeu/commande';
 import { dessiner } from '../jeu/dessin';
 import { disposer, type Disposition } from '../jeu/ecran';
+import { RenduGL } from '../jeu/rendu-gl';
 import { Peau } from '../jeu/peau';
 import { lirePartie, sauverPartie } from '../jeu/sauvegarde';
 import { Sorties } from '../jeu/sortie';
@@ -31,6 +32,7 @@ export function afficherJeu(
 ): () => void {
   racine.innerHTML = `
     <section class="jeu">
+      <canvas class="jeu-fond"></canvas>
       <canvas class="jeu-toile"></canvas>
       <button class="jeu-bocal" aria-label="Ouvrir le bocal"><canvas width="112" height="112"></canvas></button>
       <a class="jeu-retour" href="#" aria-label="Retour">←</a>
@@ -42,6 +44,16 @@ export function afficherJeu(
     </section>`;
   const toile = racine.querySelector<HTMLCanvasElement>('.jeu-toile')!;
   const ctx = toile.getContext('2d')!;
+  // La peau et la cire sont dessinées par la puce graphique sur la toile du fond ;
+  // la toile du dessus (transparente) garde les outils, le bord de la vue et la zone du pouce.
+  const fond = racine.querySelector<HTMLCanvasElement>('.jeu-fond')!;
+  let rendu: RenduGL | null | undefined; // undefined = pas encore essayé
+  const renduDisponible = (): RenduGL | null => {
+    if (!reglages.oui('vue.realiste')) return null;
+    if (rendu === undefined) rendu = RenduGL.creer(fond);
+    if (rendu?.perdu) rendu = null;
+    return rendu ?? null;
+  };
   const boutonNouveau = racine.querySelector<HTMLButtonElement>('.jeu-nouveau')!;
   const rangeeOutils = racine.querySelector<HTMLElement>('.jeu-outils')!;
   const boutonsOutil = [...rangeeOutils.querySelectorAll<HTMLButtonElement>('button')];
@@ -90,6 +102,10 @@ export function afficherJeu(
     toile.height = Math.round(h * ratio);
     toile.style.width = `${l}px`;
     toile.style.height = `${h}px`;
+    fond.width = toile.width;
+    fond.height = toile.height;
+    fond.style.width = `${l}px`;
+    fond.style.height = `${h}px`;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     const d = disposer(l, h);
     Object.assign(rangeeOutils.style, {
@@ -191,7 +207,7 @@ export function afficherJeu(
     sim.avancer((maintenant - avant) / 1000);
     avant = maintenant;
     // Poignée d'inspection pour les vérifications automatiques (invisible en jeu).
-    (window as unknown as { satisfapp: unknown }).satisfapp = { sim, dispo, peau, bocal };
+    (window as unknown as { satisfapp: unknown }).satisfapp = { sim, dispo, peau, bocal, rendu };
     const vibrer = reglages.oui('general.vibration');
     let casse = false;
     for (const e of sim.prendreEvenements()) {
@@ -258,12 +274,32 @@ export function afficherJeu(
 
     const dureeRougeur = reglages.nombre('paroi.rougeur');
     peau.nettoyer(temps, dureeRougeur);
-    dessiner(ctx, sim, dispo, peau, {
-      temps,
-      dureeRougeur,
-      sursaut: reglages.nombre('paroi.sursaut'),
-      blanchiment: reglages.nombre('vue.blanchiment') / 100,
-    });
+    const sursaut = reglages.nombre('paroi.sursaut');
+    const blanchiment = reglages.nombre('vue.blanchiment') / 100;
+    const gl = renduDisponible();
+    if (gl) {
+      const [sx, sy] = peau.sursaut(temps, sursaut);
+      gl.dessiner(sim, peau, {
+        cx: dispo.cx + sx,
+        cy: dispo.cy + sy,
+        rayon: dispo.rayon,
+        ratio: window.devicePixelRatio || 1,
+        temps,
+        dureeRougeur,
+        blanchiment,
+        douceur: reglages.nombre('vue.douceur'),
+        relief: reglages.nombre('vue.relief'),
+        grain: reglages.nombre('vue.grain'),
+        brillance: reglages.nombre('vue.brillance'),
+        humide: reglages.nombre('vue.humide'),
+        translucide: reglages.nombre('vue.translucide') / 100,
+        peauGrain: reglages.nombre('vue.peauGrain'),
+        peauPlis: reglages.nombre('vue.peauPlis'),
+        ombre: reglages.nombre('vue.ombre'),
+        qualite: reglages.nombre('vue.qualite') / 100,
+      });
+    }
+    dessiner(ctx, sim, dispo, peau, { temps, dureeRougeur, sursaut, blanchiment, parDessus: !!gl && !gl.perdu });
     const [bx, by] = centreBocal();
     sorties.dessiner(ctx, temps, dispo.rayon, bx, by);
 

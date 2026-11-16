@@ -89,6 +89,10 @@ export class Simulation {
   readonly n: number;
   readonly x: Float64Array;
   readonly y: Float64Array;
+  /** Positions au pas précédent : l'image glisse entre deux pas (fluidité sur les écrans rapides). */
+  readonly xAvant: Float64Array;
+  readonly yAvant: Float64Array;
+  readonly outilAvant = { x: 0, y: 0.5 };
   private readonly vx: Float64Array;
   private readonly vy: Float64Array;
   private readonly px: Float64Array;
@@ -150,6 +154,8 @@ export class Simulation {
     const n = (this.n = bouchon.nbPoints);
     this.x = Float64Array.from(bouchon.x0);
     this.y = Float64Array.from(bouchon.y0);
+    this.xAvant = Float64Array.from(bouchon.x0);
+    this.yAvant = Float64Array.from(bouchon.y0);
     this.vx = new Float64Array(n);
     this.vy = new Float64Array(n);
     this.px = new Float64Array(n);
@@ -217,8 +223,17 @@ export class Simulation {
     this.reste += Math.min(dt, 0.1);
     while (this.reste >= PAS) {
       this.reste -= PAS;
+      this.xAvant.set(this.x);
+      this.yAvant.set(this.y);
+      this.outilAvant.x = this.outil.x;
+      this.outilAvant.y = this.outil.y;
       this.pas();
     }
+  }
+
+  /** Où en est-on entre le pas précédent (0) et le dernier pas (1) : sert seulement à l'image. */
+  fractionDePas(): number {
+    return Math.min(1, this.reste / PAS);
   }
 
   /** Vide et renvoie les événements survenus depuis le dernier appel. */
@@ -722,6 +737,8 @@ export class Simulation {
     this.temps = e.temps;
     this.x.set(e.x);
     this.y.set(e.y);
+    this.xAvant.set(e.x);
+    this.yAvant.set(e.y);
     this.vx.fill(0);
     this.vy.fill(0);
     lireBits(this.colleAuFond, e.colleAuFond);
