@@ -14,6 +14,12 @@ export function lireParamsMatiere(r: Reglages): ParamsMatiere {
     colleSeuil: r.nombre('colle.seuil') / 100,
     colleRaideur: r.nombre('colle.raideur'),
     bonusDirection: r.nombre('colle.direction'),
+    tourColle: r.nombre('tour.colle'),
+    repli: r.nombre('tour.repli'),
+    repliDistance: r.nombre('tour.repliDistance'),
+    spatuleRayon: r.nombre('spatule.rayon'),
+    spatuleMouvement: r.nombre('spatule.mouvement'),
+    margeParoi: r.nombre('paroi.marge'),
     pincePause: r.nombre('pince.pause') / 1000,
     pinceImmobile: r.nombre('pince.immobile'),
     pinceRayon: r.nombre('pince.rayon'),
@@ -23,7 +29,6 @@ export function lireParamsMatiere(r: Reglages): ParamsMatiere {
     forceGeste: r.nombre('geste.force'),
     inertieOutil: r.nombre('outil.inertie') / 1000,
     sousPas: 8,
-    bordLibre: r.oui('bouchon.bordLibre'),
   };
 }
 
@@ -37,5 +42,7 @@ export function lireParamsBouchon(r: Reglages): ParamsBouchon {
     zonesColleesNombre: r.nombre('bouchon.colleesNombre'),
     zonesColleesIntensite: r.nombre('bouchon.colleesIntensite'),
     irregulariteCire: r.nombre('bouchon.irregulariteCire') / 100,
+    entreesNombre: r.nombre('bouchon.entreesNombre'),
+    entreesTaille: r.nombre('bouchon.entreesTaille'),
   };
 }

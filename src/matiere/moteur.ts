@@ -2,14 +2,20 @@
 //
 // Règle centrale : le temps passé sous tension modérée décolle, le pic de force déchire.
 //  - Chaque lien casse dès que son allongement dépasse sa limite (pic de force).
-//  - Chaque point est collé au fond. Sa colle ne lâche qu'avec le temps, quand la tension
-//    qu'il subit est au moins « modérée » ; tirer plus fort ne la fait pas lâcher plus vite.
+//  - L'intérieur du bouchon est collé au fond. Cette colle ne lâche qu'avec le temps, quand on tire
+//    à la pince et que la tension est au moins « modérée » ; tirer plus fort ne la fait pas lâcher plus vite.
 //  - Changer de direction fait lâcher la colle du fond plus vite.
+//  - Le tour du bouchon est collé à la paroi. Seule la spatule le décolle, point par point,
+//    en partant d'un bord déjà libre, et seulement quand elle bouge (on pèle, on ne perce pas).
+//  - Un bord décollé se rétracte vers le centre : le repli en sac.
+//  - Toucher la peau se remarque (événement « paroiTouchee »), sans aucune pénalité.
 //
 // Calcul : petits pas de temps fixes (déterministe : mêmes gestes, même résultat),
 // contraintes de distance « XPBD », stables même avec des liens raides.
 
 import type { Bouchon } from './bouchon';
+
+export type TypeOutil = 'pince' | 'spatule';
 
 export interface ParamsMatiere {
   solidite: number; // force qui casse un lien normal
@@ -18,6 +24,9 @@ export interface ParamsMatiere {
   colleSeuil: number; // tension (part de la solidité) à partir de laquelle la colle cède
   colleRaideur: number; // raideur de la colle du fond (plus haut = la matière bouge moins)
   bonusDirection: number; // accélération du décollement quand on change de direction
+  tourColle: number; // distance de frottement de la spatule pour décoller un point du tour
+  repli: number; // force avec laquelle un bord décollé se rétracte vers le centre
+  repliDistance: number; // jusqu'où il se rétracte (unités de vue)
   amortissement: number; // freinage des mouvements (par seconde)
   pincePause: number; // secondes d'immobilité pour fermer la pince
   pinceImmobile: number; // vitesse sous laquelle l'outil est considéré immobile
@@ -25,10 +34,12 @@ export interface ParamsMatiere {
   pinceFragilite: number; // solidité restante autour d'une prise sur zone encore collée
   pinceRenfort: number; // la cire pincée (pliée dans la pince) résiste N fois mieux
   pinceZonePliee: number; // taille de la zone renforcée, en multiple de la taille de la prise
+  spatuleRayon: number; // portée de la pointe de la spatule
+  spatuleMouvement: number; // vitesse minimale pour que la spatule (ou un outil qui racle) agisse
+  margeParoi: number; // distance tolérée entre la spatule et la matière avant de toucher la peau
   forceGeste: number; // force de traction par unité de distance entre le pouce et la prise
   inertieOutil: number; // secondes de retard de l'outil quand il ne tient rien
   sousPas: number; // nombre de petits pas de calcul par image
-  bordLibre: boolean; // le tour du bouchon commence déjà décollé (lot 1, avant la spatule)
 }
 
 export type Evenement =
@@ -36,6 +47,8 @@ export type Evenement =
   | { type: 'pinceOuverte' }
   | { type: 'lienCasse'; lien: number }
   | { type: 'pointDecolle'; point: number }
+  | { type: 'tourDecolle'; point: number }
+  | { type: 'paroiTouchee'; x: number; y: number }
   | { type: 'morceauSorti'; points: number; part: number };
 
 // Constantes techniques (pas des sensations) :
@@ -43,6 +56,10 @@ const PAS = 1 / 60; // pas de temps fixe, en secondes
 const MEMOIRE_DIRECTION = 0.4; // secondes : vitesse à laquelle la colle « oublie » la direction de traction
 const BORD_DE_LA_VUE = 1; // un morceau libre que la pince emmène au-delà de ce rayon est sorti
 const LIMITE_CIBLE = 1.35; // le pouce ne peut pas emmener l'outil plus loin que ça
+export const RAYON_PAROI = 0.95; // au-delà, la pince ouverte racle la paroi du conduit
+const RAIDEUR_TOUR = 3; // la colle du tour tient N fois plus raide que celle du fond
+const COMPRESSION = 0.3; // la cire se laisse tasser plus facilement qu'étirer (elle se plie)
+const ENTRE_DEUX_CONTACTS = 0.3; // secondes minimum entre deux contacts avec la paroi
 
 export class Simulation {
   readonly b: Bouchon;
@@ -54,10 +71,14 @@ export class Simulation {
   private readonly vy: Float64Array;
   private readonly px: Float64Array;
   private readonly py: Float64Array;
-  /** 1 tant que le point est collé au fond. */
+  /** 1 tant que le point est collé au fond (intérieur du bouchon). */
   readonly colleAuFond: Uint8Array;
   /** Reste de colle du fond, de 1 (intacte) à 0 (lâchée). */
   readonly sante: Float64Array;
+  /** 1 tant que le point du tour est collé à la paroi. */
+  readonly colleAuTour: Uint8Array;
+  /** Reste de colle du tour, de 1 à 0. */
+  readonly santeTour: Float64Array;
   /** Direction récente de la traction de la pince. */
   private dirX = 0;
   private dirY = 0;
@@ -67,10 +88,12 @@ export class Simulation {
   readonly sorti: Uint8Array;
   /** Numéro de morceau de chaque point (morceau = points reliés entre eux). */
   readonly morceau: Int32Array;
+  /** 1 si le morceau tient encore quelque part (fond ou tour). */
   morceauColle: Uint8Array = new Uint8Array(0);
   morceauTaille: Int32Array = new Int32Array(0);
 
   readonly outil = {
+    type: 'pince' as TypeOutil,
     x: 0,
     y: 0.5,
     cibleX: 0,
@@ -80,6 +103,7 @@ export class Simulation {
     faible: false,
     tempsImmobile: 0,
     essaiFait: false,
+    vitesse: 0,
     prise: [] as number[],
     decalX: [] as number[],
     decalY: [] as number[],
@@ -91,6 +115,7 @@ export class Simulation {
   readonly morceauxSortis: number[] = [];
   private reste = 0;
   private morceauxAJour = false;
+  private dernierContact = -Infinity;
   private readonly lienPinceFaible: Uint8Array;
   /** 1 si le lien touche un point tenu dans la pince. */
   private readonly lienTenu: Uint8Array;
@@ -105,20 +130,16 @@ export class Simulation {
     this.vy = new Float64Array(n);
     this.px = new Float64Array(n);
     this.py = new Float64Array(n);
-    this.colleAuFond = new Uint8Array(n).fill(1);
-    this.sante = new Float64Array(n).fill(1);
+    // Le tour est collé à la paroi (sauf aux points d'entrée) ; l'intérieur est collé au fond.
+    this.colleAuFond = Uint8Array.from(bouchon.bord, (b) => (b ? 0 : 1));
+    this.sante = Float64Array.from(this.colleAuFond);
+    this.colleAuTour = Uint8Array.from(bouchon.bord, (b, i) => (b && !bouchon.entree[i] ? 1 : 0));
+    this.santeTour = Float64Array.from(this.colleAuTour);
     this.sorti = new Uint8Array(n);
     this.morceau = new Int32Array(n);
     this.lienOk = new Uint8Array(bouchon.lienA.length).fill(1);
     this.lienPinceFaible = new Uint8Array(bouchon.lienA.length);
     this.lienTenu = new Uint8Array(bouchon.lienA.length);
-    if (params.bordLibre) {
-      // Lot 1 : le tour est déjà décollé (la spatule arrive au lot 2). Les points du bord sont libres.
-      for (let i = 0; i < n; i++) if (this.estLibreOuAuBord(i)) this.colleAuFond[i] = 0;
-      this.sante.forEach((_, i) => {
-        if (!this.colleAuFond[i]) this.sante[i] = 0;
-      });
-    }
     this.calculerMorceaux();
   }
 
@@ -134,7 +155,17 @@ export class Simulation {
   /** Le doigt quitte l'écran : la pince s'ouvre. */
   leverDoigt(): void {
     this.outil.doigt = false;
+    this.outil.vitesse = 0;
     this.ouvrirPince();
+  }
+
+  /** Change d'outil (la pince lâche ce qu'elle tenait). */
+  choisirOutil(type: TypeOutil): void {
+    if (this.outil.type === type) return;
+    this.ouvrirPince();
+    this.outil.type = type;
+    this.outil.tempsImmobile = 0;
+    this.outil.essaiFait = false;
   }
 
   /** Là où le pouce veut emmener l'outil. */
@@ -208,6 +239,16 @@ export class Simulation {
     return k;
   }
 
+  /** Nombre de points du tour encore collés à la paroi. */
+  tourRestant(): number {
+    return this.colleAuTour.reduce((a, c) => a + c, 0);
+  }
+
+  /** Vrai si le point ne tient plus à rien (ni fond, ni tour). */
+  estLibre(i: number): boolean {
+    return !this.colleAuFond[i] && !this.colleAuTour[i];
+  }
+
   private pas(): void {
     const p = this.params;
     this.temps += PAS;
@@ -221,17 +262,28 @@ export class Simulation {
     const nl = b.lienA.length;
     const h2 = h * h;
     // Souplesse de chaque élément (inverse de la raideur), pour le calcul XPBD.
-    const souplesseColle = 1 / Math.max(1e-6, p.colleRaideur) / h2;
+    const kFond = 1 / (1 + 1 / Math.max(1e-6, p.colleRaideur) / h2);
+    const kTour = 1 / (1 + 1 / Math.max(1e-6, p.colleRaideur * RAIDEUR_TOUR) / h2);
     const prise = this.outil.ferme ? this.outil.prise : [];
-    const souplessePrise = prise.length > 0 ? prise.length / Math.max(1e-6, p.forceGeste) / h2 : 0;
+    const kPrise = prise.length > 0 ? 1 / (1 + prise.length / Math.max(1e-6, p.forceGeste) / h2) : 0;
 
     for (let s = 0; s < S; s++) {
       for (let i = 0; i < this.n; i++) {
         if (sorti[i]) continue;
         px[i] = x[i];
         py[i] = y[i];
-        x[i] += vx[i] * freinage * h;
-        y[i] += vy[i] * freinage * h;
+        let ax = 0;
+        let ay = 0;
+        if (b.bord[i] && this.estLibre(i) && p.repli > 0) {
+          // Repli en sac : le bord décollé se rétracte vers le centre, jusqu'à une certaine distance.
+          const r = Math.hypot(x[i], y[i]) || 1;
+          const retrait = Math.hypot(b.x0[i], b.y0[i]) - r;
+          const reste = Math.max(0, 1 - retrait / Math.max(1e-4, p.repliDistance));
+          ax = (-x[i] / r) * p.repli * reste;
+          ay = (-y[i] / r) * p.repli * reste;
+        }
+        x[i] += (vx[i] * freinage + ax * h) * h;
+        y[i] += (vy[i] * freinage + ay * h) * h;
       }
       // Les liens de la cire.
       for (let l = 0; l < nl; l++) {
@@ -244,7 +296,8 @@ export class Simulation {
         if (d < 1e-9) continue;
         const L0 = b.lienLongueur[l];
         const souplesse = (p.elasticite * L0) / Math.max(1e-6, p.solidite) / h2;
-        const corr = (d - L0) / (2 + souplesse);
+        let corr = (d - L0) / (2 + souplesse);
+        if (d < L0) corr *= COMPRESSION;
         const ux = dx / d;
         const uy = dy / d;
         x[a] += ux * corr;
@@ -252,21 +305,19 @@ export class Simulation {
         x[c] -= ux * corr;
         y[c] -= uy * corr;
       }
-      // La colle du fond : chaque point collé est tiré vers sa place d'origine.
+      // La colle : chaque point collé (au fond ou à la paroi) est tiré vers sa place d'origine.
       for (let i = 0; i < this.n; i++) {
-        if (!this.colleAuFond[i] || sorti[i]) continue;
-        const k = 1 / (1 + souplesseColle);
+        if (sorti[i]) continue;
+        const k = this.colleAuTour[i] ? kTour : this.colleAuFond[i] ? kFond : 0;
+        if (k === 0) continue;
         x[i] += (b.x0[i] - x[i]) * k;
         y[i] += (b.y0[i] - y[i]) * k;
       }
       // La pince tire les points saisis vers le pouce.
-      if (prise.length > 0) {
-        const k = 1 / (1 + souplessePrise);
-        for (let q = 0; q < prise.length; q++) {
-          const i = prise[q];
-          x[i] += (this.outil.cibleX + this.outil.decalX[q] - x[i]) * k;
-          y[i] += (this.outil.cibleY + this.outil.decalY[q] - y[i]) * k;
-        }
+      for (let q = 0; q < prise.length; q++) {
+        const i = prise[q];
+        x[i] += (this.outil.cibleX + this.outil.decalX[q] - x[i]) * kPrise;
+        y[i] += (this.outil.cibleY + this.outil.decalY[q] - y[i]) * kPrise;
       }
       for (let i = 0; i < this.n; i++) {
         if (sorti[i]) continue;
@@ -303,6 +354,8 @@ export class Simulation {
     const b = this.b;
     const changement = this.changementDeDirection();
     const acceleration = 1 + p.bonusDirection * changement;
+    // La colle du fond ne lâche que quand on tire (pince fermée sur de la matière décollée).
+    if (!this.outil.ferme || this.outil.faible) return;
     for (let i = 0; i < this.n; i++) {
       if (!this.colleAuFond[i] || this.sorti[i]) continue;
       const d = Math.hypot(this.x[i] - b.x0[i], this.y[i] - b.y0[i]);
@@ -346,52 +399,111 @@ export class Simulation {
   }
 
   private decoller(i: number): void {
+    if (!this.colleAuFond[i]) return;
     this.colleAuFond[i] = 0;
     this.sante[i] = 0;
     this.morceauxAJour = false;
     this.evenements.push({ type: 'pointDecolle', point: i });
   }
 
-  // ---------- La pince ----------
+  private decollerTour(i: number): void {
+    if (!this.colleAuTour[i]) return;
+    this.colleAuTour[i] = 0;
+    this.santeTour[i] = 0;
+    this.morceauxAJour = false;
+    this.evenements.push({ type: 'tourDecolle', point: i });
+  }
+
+  // ---------- Les outils ----------
 
   private mettreAJourOutil(): void {
     const o = this.outil;
     const p = this.params;
-    if (o.ferme || !o.doigt) return;
+    if (!o.doigt) {
+      o.vitesse = 0;
+      return;
+    }
     const avantX = o.x;
     const avantY = o.y;
-    const k = p.inertieOutil <= 0 ? 1 : 1 - Math.exp(-PAS / p.inertieOutil);
-    o.x += (o.cibleX - o.x) * k;
-    o.y += (o.cibleY - o.y) * k;
-    const vitesse = Math.hypot(o.x - avantX, o.y - avantY) / PAS;
-    if (vitesse < p.pinceImmobile) {
-      o.tempsImmobile += PAS;
-    } else {
-      o.tempsImmobile = 0;
-      o.essaiFait = false;
+    if (!o.ferme) {
+      const k = p.inertieOutil <= 0 ? 1 : 1 - Math.exp(-PAS / p.inertieOutil);
+      o.x += (o.cibleX - o.x) * k;
+      o.y += (o.cibleY - o.y) * k;
     }
-    if (!o.essaiFait && o.tempsImmobile >= p.pincePause) {
-      o.essaiFait = true;
-      this.fermerPince();
+    const deplacement = Math.hypot(o.x - avantX, o.y - avantY);
+    o.vitesse = deplacement / PAS;
+
+    if (o.type === 'pince' && !o.ferme) {
+      if (o.vitesse < p.pinceImmobile) {
+        o.tempsImmobile += PAS;
+      } else {
+        o.tempsImmobile = 0;
+        o.essaiFait = false;
+      }
+      if (!o.essaiFait && o.tempsImmobile >= p.pincePause) {
+        o.essaiFait = true;
+        this.fermerPince();
+      }
+    }
+    if (o.type === 'spatule' && o.vitesse >= p.spatuleMouvement) this.spatuler(deplacement);
+    this.verifierParoi();
+  }
+
+  /**
+   * La spatule se glisse entre la cire et la peau. Chaque petit mouvement use la colle du tour
+   * des points sous sa pointe, mais seulement à côté d'un bord déjà libre.
+   */
+  private spatuler(deplacement: number): void {
+    const o = this.outil;
+    const p = this.params;
+    for (let i = 0; i < this.n; i++) {
+      if (!this.colleAuTour[i] || this.sorti[i]) continue;
+      if (Math.hypot(this.x[i] - o.x, this.y[i] - o.y) > p.spatuleRayon) continue;
+      if (!this.aCoteDUnBordLibre(i)) continue;
+      this.santeTour[i] -= deplacement / Math.max(1e-4, p.tourColle);
+      if (this.santeTour[i] <= 0) this.decollerTour(i);
     }
   }
 
-  /** Vrai si le point peut être saisi franchement : déjà décollé du fond, ou au bord de la matière. */
-  estLibreOuAuBord(i: number): boolean {
-    if (!this.colleAuFond[i]) return true;
+  /** Vrai si un voisin du point sur le tour est déjà décollé, ou si la cire est déchirée à côté. */
+  aCoteDUnBordLibre(i: number): boolean {
     const b = this.b;
-    let liens = 0;
-    for (let l = 0; l < b.lienA.length; l++) {
-      if (!this.lienOk[l] || (b.lienA[l] !== i && b.lienB[l] !== i)) continue;
-      liens++;
-      let triangles = 0;
-      for (let k = 0; k < 2; k++) {
-        const t = b.lienTriangles[2 * l + k];
-        if (t >= 0 && this.triangleIntact(t)) triangles++;
-      }
-      if (triangles < 2) return true;
+    for (let k = b.voisinsDebut[i]; k < b.voisinsDebut[i + 1]; k++) {
+      const v = b.voisins[k];
+      if (!this.lienOk[b.voisinsLien[k]]) return true; // déchirure : un bord libre
+      if (b.bord[v] && !this.colleAuTour[v]) return true;
     }
-    return liens === 0;
+    return false;
+  }
+
+  /**
+   * La paroi sensible : la spatule qui déborde de la matière vers la peau,
+   * ou la pince ouverte qui racle la paroi du conduit.
+   */
+  private verifierParoi(): void {
+    const o = this.outil;
+    const p = this.params;
+    if (o.vitesse < p.spatuleMouvement || this.temps - this.dernierContact < ENTRE_DEUX_CONTACTS) return;
+    let touche = false;
+    if (o.type === 'spatule') {
+      touche = this.distanceALaMatiere(o.x, o.y) > p.margeParoi;
+    } else if (!o.ferme) {
+      touche = Math.hypot(o.x, o.y) > RAYON_PAROI;
+    }
+    if (touche) {
+      this.dernierContact = this.temps;
+      this.evenements.push({ type: 'paroiTouchee', x: o.x, y: o.y });
+    }
+  }
+
+  /** Distance entre un endroit et le point de matière le plus proche (encore dans la vue). */
+  distanceALaMatiere(x: number, y: number): number {
+    let min = Infinity;
+    for (let i = 0; i < this.n; i++) {
+      if (this.sorti[i]) continue;
+      min = Math.min(min, Math.hypot(this.x[i] - x, this.y[i] - y));
+    }
+    return min;
   }
 
   triangleIntact(t: number): boolean {
@@ -416,15 +528,18 @@ export class Simulation {
     }
     if (proches.length === 0) return; // rien sous la pince : elle reste ouverte
 
-    const franche = proches.some((i) => this.estLibreOuAuBord(i));
-    o.prise = franche ? proches : [plusProche];
+    // La pince ne tient bien que ce qui est décollé.
+    const libres = proches.filter((i) => this.estLibre(i));
+    const franche = libres.length > 0;
+    o.prise = franche ? libres : [plusProche];
     o.faible = !franche;
     const b = this.b;
     if (!franche) {
       // Sur une zone encore collée, la pince n'attrape que la surface : une miette.
       this.decoller(plusProche);
-      for (let l = 0; l < b.lienA.length; l++) {
-        if (b.lienA[l] === plusProche || b.lienB[l] === plusProche) this.lienPinceFaible[l] = 1;
+      this.decollerTour(plusProche);
+      for (let k = b.voisinsDebut[plusProche]; k < b.voisinsDebut[plusProche + 1]; k++) {
+        this.lienPinceFaible[b.voisinsLien[k]] = 1;
       }
     } else {
       // Prise franche : la cire pliée dans la pince (et juste autour) résiste mieux que le reste.
@@ -475,7 +590,7 @@ export class Simulation {
 
   // ---------- Morceaux ----------
 
-  /** Regroupe les points reliés entre eux en morceaux, et note lesquels tiennent encore au fond. */
+  /** Regroupe les points reliés entre eux en morceaux, et note lesquels tiennent encore. */
   calculerMorceaux(): void {
     const parent = new Int32Array(this.n);
     for (let i = 0; i < this.n; i++) parent[i] = i;
@@ -509,13 +624,13 @@ export class Simulation {
       const m = this.morceau[i];
       if (m < 0) continue;
       this.morceauTaille[m]++;
-      if (this.colleAuFond[i]) this.morceauColle[m] = 1;
+      if (!this.estLibre(i)) this.morceauColle[m] = 1;
     }
     this.morceauxAJour = true;
   }
 
   /**
-   * Un morceau qui ne tient plus au fond, tenu par la pince : quand la pince l'emmène
+   * Un morceau qui ne tient plus à rien, tenu par la pince : quand la pince l'emmène
    * au-delà du bord de la vue ronde, il sort en entier (il « suit » la pince).
    */
   private sortirMorceauTenu(): void {

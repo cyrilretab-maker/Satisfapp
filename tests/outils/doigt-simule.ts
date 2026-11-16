@@ -81,3 +81,72 @@ export function tirer(sim: Simulation, t: Traction): void {
 export function plusGrosSorti(sim: Simulation): number {
   return sim.morceauxSortis.reduce((a, b) => Math.max(a, b), 0);
 }
+
+/** Angle (depuis le centre) d'un point d'entrée du bouchon. */
+export function angleDEntree(sim: Simulation): number {
+  for (let i = 0; i < sim.n; i++) if (sim.b.entree[i]) return Math.atan2(sim.b.y0[i], sim.b.x0[i]);
+  return 0;
+}
+
+/**
+ * Fait le tour à la spatule comme un joueur appliqué : va au point du tour décollable le plus
+ * proche, le travaille par petits mouvements jusqu'à ce qu'il lâche, puis passe au suivant.
+ * Renvoie la durée en secondes.
+ */
+export function faireLeTour(sim: Simulation, dureeMax = 120, vitesse = 0.6): number {
+  sim.choisirOutil('spatule');
+  const t0 = sim.temps;
+  const prochain = (): number => {
+    let meilleur = -1;
+    let dMin = Infinity;
+    for (let i = 0; i < sim.n; i++) {
+      if (!sim.colleAuTour[i] || !sim.aCoteDUnBordLibre(i)) continue;
+      const d = Math.hypot(sim.x[i] - sim.outil.x, sim.y[i] - sim.outil.y);
+      if (d < dMin) {
+        dMin = d;
+        meilleur = i;
+      }
+    }
+    return meilleur;
+  };
+  const premier = prochain();
+  if (premier >= 0) sim.placerOutil(sim.x[premier], sim.y[premier]);
+  sim.poserDoigt();
+  let cx = sim.outil.x;
+  let cy = sim.outil.y;
+  while (sim.tourRestant() > 0 && sim.temps - t0 < dureeMax) {
+    const i = prochain();
+    if (i < 0) break;
+    const dx = sim.x[i] - cx;
+    const dy = sim.y[i] - cy;
+    const d = Math.hypot(dx, dy);
+    const pas = Math.min(d, vitesse * IMAGE);
+    if (d > 1e-6) {
+      cx += (dx / d) * pas;
+      cy += (dy / d) * pas;
+    }
+    // Petits va-et-vient sur place (la spatule n'agit qu'en bougeant).
+    const t = sim.temps * Math.PI * 2 * 4;
+    sim.definirCible(cx + 0.015 * Math.cos(t), cy + 0.015 * Math.sin(t));
+    sim.avancer(IMAGE);
+  }
+  sim.leverDoigt();
+  sim.choisirOutil('pince');
+  return sim.temps - t0;
+}
+
+/** Le point du bord déjà décollé le plus loin dans une direction (là où un joueur saisit). */
+export function pointLibreDuBord(sim: Simulation, angle: number): number {
+  const [cx, cy] = [Math.cos(angle), Math.sin(angle)];
+  let meilleur = -1;
+  let max = -Infinity;
+  for (let i = 0; i < sim.n; i++) {
+    if (sim.sorti[i] || !sim.b.bord[i] || !sim.estLibre(i)) continue;
+    const proj = sim.x[i] * cx + sim.y[i] * cy;
+    if (proj > max) {
+      max = proj;
+      meilleur = i;
+    }
+  }
+  return meilleur >= 0 ? meilleur : pointDuBord(sim, angle);
+}

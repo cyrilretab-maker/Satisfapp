@@ -13,6 +13,8 @@ export interface ParamsBouchon {
   zonesColleesNombre: number;
   zonesColleesIntensite: number; // la colle du fond y dure jusqu'à N fois plus longtemps
   irregulariteCire: number; // variation de solidité d'un lien à l'autre (0..1)
+  entreesNombre: number; // endroits du tour à peine décollés, pour commencer
+  entreesTaille: number; // nombre de points du bord dans chaque point d'entrée
 }
 
 export interface Bouchon {
@@ -29,6 +31,11 @@ export interface Bouchon {
   triangles: Int32Array; // 3 points par triangle
   triangleLiens: Int32Array; // 3 liens par triangle
   lienTriangles: Int32Array; // 2 triangles par lien (-1 si absent)
+  bord: Uint8Array; // 1 si le point est sur le tour du bouchon (collé à la paroi)
+  entree: Uint8Array; // 1 si le point du bord est un point d'entrée (déjà à peine décollé)
+  voisinsDebut: Int32Array; // voisins du point i : voisins[voisinsDebut[i] .. voisinsDebut[i+1]]
+  voisins: Int32Array;
+  voisinsLien: Int32Array; // le lien qui mène à chaque voisin
 }
 
 const BANDE_ZONE_FAIBLE = 0.55; // largeur d'une zone faible, en distance entre points
@@ -46,7 +53,7 @@ export function genererBouchon(graine: number, p: ParamsBouchon): Bouchon {
   const rayonA = (angle: number) => {
     let r = 1;
     for (const b of bosses) r += b.ampl * Math.cos(b.k * angle + b.phase);
-    return Math.min(0.97, p.taille * r);
+    return Math.min(0.93, p.taille * r); // reste en deçà de la paroi (0,95)
   };
 
   // 2. Les points, posés en grille triangulaire.
@@ -166,6 +173,52 @@ export function genererBouchon(graine: number, p: ParamsBouchon): Bouchon {
     colle[k] = Math.max(1, c);
   }
 
+  // 6. Le tour : les points du bord (sur un lien qui ne borde qu'un seul triangle).
+  const bord = new Uint8Array(n);
+  for (let l = 0; l < nl; l++) {
+    if (lienTriangles[2 * l + 1] < 0) {
+      bord[lienA[l]] = 1;
+      bord[lienB[l]] = 1;
+    }
+  }
+
+  // 7. Les voisins de chaque point (pour parcourir le tour et la nappe).
+  const compte = new Int32Array(n + 1);
+  for (let l = 0; l < nl; l++) {
+    compte[lienA[l] + 1]++;
+    compte[lienB[l] + 1]++;
+  }
+  for (let i = 0; i < n; i++) compte[i + 1] += compte[i];
+  const voisinsDebut = Int32Array.from(compte);
+  const voisins = new Int32Array(2 * nl);
+  const voisinsLien = new Int32Array(2 * nl);
+  const curseur = Int32Array.from(compte);
+  for (let l = 0; l < nl; l++) {
+    voisins[curseur[lienA[l]]] = lienB[l];
+    voisinsLien[curseur[lienA[l]]++] = l;
+    voisins[curseur[lienB[l]]] = lienA[l];
+    voisinsLien[curseur[lienB[l]]++] = l;
+  }
+
+  // 8. Les points d'entrée : quelques endroits du tour à peine décollés, en suivant le bord.
+  const entree = new Uint8Array(n);
+  const pointsDuBord = [...bord.keys()].filter((i) => bord[i]);
+  for (let e = 0; e < Math.round(p.entreesNombre) && pointsDuBord.length > 0; e++) {
+    const depart = pointsDuBord[Math.floor(hasard() * pointsDuBord.length)];
+    const file = [depart];
+    let pris = 0;
+    while (file.length > 0 && pris < Math.round(p.entreesTaille)) {
+      const i = file.shift()!;
+      if (entree[i]) continue;
+      entree[i] = 1;
+      pris++;
+      for (let k = voisinsDebut[i]; k < voisinsDebut[i + 1]; k++) {
+        const v = voisins[k];
+        if (bord[v] && !entree[v] && lienTriangles[2 * voisinsLien[k] + 1] < 0) file.push(v);
+      }
+    }
+  }
+
   return {
     graine,
     nbPoints: n,
@@ -180,6 +233,11 @@ export function genererBouchon(graine: number, p: ParamsBouchon): Bouchon {
     triangles: Int32Array.from(triangles),
     triangleLiens,
     lienTriangles,
+    bord,
+    entree,
+    voisinsDebut,
+    voisins,
+    voisinsLien,
   };
 }
 
