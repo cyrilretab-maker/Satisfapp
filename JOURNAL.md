@@ -25,6 +25,11 @@ Durée d'un essai : 3000 ms. Volume : 60 %.
 - [ ] App installée sur le téléphone, ouverte en mode avion.
 - [ ] Cyril distingue les trois rythmes.
 
+### Premier retour de Cyril (2026-11-16)
+- App en ligne et installée. Les trois rythmes se distinguent (au son), **mais la vibration est si faible qu'on ne la sent pas**.
+- Ajout d'un diagnostic sur la page de test : il dit si le navigateur accepte ou refuse la vibration.
+- Piste en cours : allonger les pulsations au panneau (la vibration web n'a pas de réglage de force, seulement des durées) et vérifier l'intensité des vibrations dans les réglages d'Android. Si ça ne suffit pas : passer en app Android (Capacitor), comme prévu par le cahier des charges.
+
 ## Comment c'est rangé (pour reprendre une session)
 
 - `src/reglages/defauts.json` : **toutes** les valeurs de sensation et leurs bornes. Le panneau se construit tout seul à partir de ce fichier.
