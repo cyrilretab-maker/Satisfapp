@@ -20,7 +20,7 @@ Durée d'un essai : 3000 ms. Volume : 60 %.
 
 ## Ce qui reste pour valider le lot 0
 
-- [ ] Dépôt GitHub `satisfapp` créé (public) et code envoyé.
+- [x] Dépôt GitHub `cyrilretab-maker/Satisfapp` créé (public) et code envoyé.
 - [ ] GitHub Pages activé (source : GitHub Actions), adresse HTTPS qui répond.
 - [ ] App installée sur le téléphone, ouverte en mode avion.
 - [ ] Cyril distingue les trois rythmes.
