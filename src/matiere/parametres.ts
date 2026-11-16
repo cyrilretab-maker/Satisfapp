@@ -34,6 +34,21 @@ export function lireParamsMatiere(r: Reglages): ParamsMatiere {
     inertieOutil: r.nombre('outil.inertie') / 1000,
     sousPas: 8,
     filsDeCire: r.oui('matiere.fils'),
+    dureRaideur: r.nombre('nature.dureRaideur'),
+    dureCassant: r.nombre('nature.dureCassant') / 100,
+    dureColle: r.nombre('nature.dureColle'),
+    collanteColle: r.nombre('nature.collanteColle'),
+    collanteEtire: r.nombre('nature.collanteEtire'),
+    molleSolidite: r.nombre('nature.molleSolidite') / 100,
+    cotonRayon: r.nombre('coton.rayon'),
+    cotonAbsorbe: r.nombre('coton.absorbe'),
+    aspiRayon: r.nombre('aspi.rayon'),
+    aspiDebit: r.nombre('aspi.debit'),
+    aspiMiette: r.nombre('aspi.miette'),
+    paroisCroute: r.nombre('parois.croute'),
+    paroisCollant: r.nombre('parois.collant'),
+    paroisLiquide: r.nombre('parois.liquide'),
+    paroisAspiration: r.nombre('parois.aspiration'),
   };
 }
 
@@ -49,5 +64,10 @@ export function lireParamsBouchon(r: Reglages): ParamsBouchon {
     irregulariteCire: r.nombre('bouchon.irregulariteCire') / 100,
     entreesNombre: r.nombre('bouchon.entreesNombre'),
     entreesTaille: r.nombre('bouchon.entreesTaille'),
+    duresNombre: r.nombre('bouchon.duresNombre'),
+    collantesNombre: r.nombre('bouchon.collantesNombre'),
+    mollesNombre: r.nombre('bouchon.mollesNombre'),
+    naturesTaille: r.nombre('bouchon.naturesTaille') / 100,
+    paroisQuantite: r.nombre('parois.quantite') / 100,
   };
 }

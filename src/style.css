@@ -120,8 +120,8 @@ h1 { margin: 0; font-weight: 600; }
   font-size: 1.2rem;
   padding: 18px 28px;
 }
-.jeu-outils { position: fixed; display: flex; gap: 12px; }
-.jeu-outils button { flex: 1; font-size: 1.05rem; padding: 0; }
+.jeu-outils { position: fixed; display: flex; gap: 6px; }
+.jeu-outils button { flex: 1; font-size: 0.85rem; padding: 0 2px; min-width: 0; }
 .jeu-outils button.actif { background: #5a5a5a; border-color: #9a9a9a; color: #fff; }
 
 /* Le bocal, toujours visible dans le coin en haut à gauche */

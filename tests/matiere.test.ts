@@ -263,7 +263,7 @@ describe('La paroi sensible', () => {
 
   it('la pince ouverte qui racle la paroi la touche ; au milieu, non', () => {
     const racler = (r: number) => {
-      const sim = nouvelleSimulation(1);
+      const sim = nouvelleSimulation(1, { 'parois.quantite': 0 }); // paroi propre
       sim.placerOutil(r, 0);
       sim.poserDoigt();
       for (let t = 0; t < 1; t += IMAGE) {
@@ -277,13 +277,14 @@ describe('La paroi sensible', () => {
   });
 
   it('toucher la paroi ne punit pas : rien du bouchon ne change', () => {
-    const sim = nouvelleSimulation(1);
+    const sim = nouvelleSimulation(1, { 'parois.quantite': 0 });
     const avantTour = sim.tourRestant();
     const avantFond = nbDecolles(sim);
     frotter(sim, 0.96, 0, 3, 0.02);
     expect(sim.tourRestant()).toBe(avantTour);
     expect(nbDecolles(sim)).toBe(avantFond);
-    expect(sim.lienOk.every((l) => l === 1)).toBe(true);
+    // (la cire molle d'un bord replié peut se séparer toute seule : ce n'est pas le contact)
+    expect(sim.lienOk.every((l, k) => l === 1 || sim.lienMou(k))).toBe(true);
   });
 });
 

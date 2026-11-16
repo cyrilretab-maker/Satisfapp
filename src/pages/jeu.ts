@@ -16,6 +16,7 @@ import { brancherCommande } from '../jeu/commande';
 import { dessiner } from '../jeu/dessin';
 import { disposer, type Disposition } from '../jeu/ecran';
 import { RenduGL } from '../jeu/rendu-gl';
+import { FOND, versVue, type Vue3D } from '../jeu/perspective';
 import { Peau } from '../jeu/peau';
 import { lirePartie, sauverPartie } from '../jeu/sauvegarde';
 import { Sorties } from '../jeu/sortie';
@@ -39,6 +40,8 @@ export function afficherJeu(
       <div class="jeu-outils">
         <button data-outil="spatule">Spatule</button>
         <button data-outil="pince">Pince</button>
+        <button data-outil="coton">Coton-tige</button>
+        <button data-outil="aspirateur">Aspirateur</button>
       </div>
       <button class="jeu-nouveau" hidden>Nouveau bouchon</button>
     </section>`;
@@ -84,6 +87,9 @@ export function afficherJeu(
   }
   choisir(sim.outil.type);
   let finDepuis = -1; // instant où le conduit est devenu vide
+  // V2 : le conduit en profondeur. Le point de fuite suit doucement l'outil (effet 3D).
+  const vue: Vue3D = { fond: reglages.nombre('vue.profondeur') / 100, fuiteX: 0, fuiteY: 0 };
+  let salissureCoton = 0; // le coton-tige jaunit en buvant la cire ; un nouveau à chaque fois qu'on le prend
   dessinerIconeBocal();
 
   // Le navigateur n'autorise le son qu'après un toucher.
@@ -118,6 +124,7 @@ export function afficherJeu(
   }
 
   function choisir(type: TypeOutil) {
+    if (type === 'coton' && sim.outil.type !== 'coton') salissureCoton = 0;
     sim.choisirOutil(type);
     for (const b of boutonsOutil) b.classList.toggle('actif', b.dataset.outil === type);
   }
@@ -180,7 +187,8 @@ export function afficherJeu(
     toile,
     () => sim,
     () => dispo,
-    () => reglages.nombre('commande.sensibilite'),
+    // Le fond paraît plus petit : le pouce garde la même vitesse à l'écran.
+    () => (reglages.nombre('commande.sensibilite') * FOND) / Math.max(0.2, vue.fond),
   );
 
   // Chaque curseur agit tout de suite sur le bouchon en cours.
@@ -214,6 +222,12 @@ export function afficherJeu(
       if (e.type === 'pinceFermee') sons.tic(volumes.tics, 0.6);
       if (e.type === 'lienCasse' && sim.outil.doigt) casse = true;
       if (e.type === 'fondAffaibli') sons.tic(volumes.tics * 0.6, 0.7);
+      if (e.type === 'absorbe') {
+        // Cire molle bue ou aspirée : un petit bruit mouillé, très doux.
+        sons.tic(volumes.tics * 0.35, 0.5);
+        if (sim.outil.type === 'coton') salissureCoton += e.points * 0.04;
+      }
+      if (e.type === 'paroiNettoyee' && sim.outil.type === 'coton') salissureCoton += e.quantite * 0.3;
       if (e.type === 'tourDecolle') {
         sons.tic(volumes.tics);
         const tic = reglages.nombre('vib.tic');
@@ -229,7 +243,8 @@ export function afficherJeu(
           mx += sim.x[i];
           my += sim.y[i];
         }
-        sorties.lancer(morceau, dispo.cx + (mx / e.indices.length) * dispo.rayon, dispo.cy + (my / e.indices.length) * dispo.rayon, temps);
+        const [vx, vy] = versVue(mx / e.indices.length, my / e.indices.length, vue);
+        sorties.lancer(morceau, dispo.cx + vx * dispo.rayon, dispo.cy + vy * dispo.rayon, temps);
         setTimeout(dessinerIconeBocal, 900);
         if (e.part >= reglages.nombre('vib.grandeSortie') / 100) {
           // La grande sortie : tout s'arrête, un décollement ample, puis le silence.
@@ -267,7 +282,11 @@ export function afficherJeu(
       frottement = Math.max(frottement, 0.6);
     }
     // La fin : peau claire, silence, puis un seul bouton.
-    const vide = sim.pointsRestants() === 0;
+    // Les instruments qui nettoient (coton-tige, aspirateur, spatule sur la paroi) frottent aussi.
+    if (sim.travail > 0.02) frottement = Math.max(frottement, Math.min(1, 0.3 + sim.travail));
+    if (sim.outil.type === 'aspirateur' && sim.outil.doigt) frottement = Math.max(frottement, 0.35);
+    // La fin : plus rien au fond ni sur les parois.
+    const vide = sim.toutPropre(reglages.nombre('parois.propre') / 100);
     if (vide && finDepuis < 0) finDepuis = temps;
     if (vide && temps - finDepuis > ATTENTE_FIN && !sorties.enCours()) boutonNouveau.hidden = false;
     sons.frottement(vide || pilote.enSilence(temps) ? 0 : frottement * volumes.frottement);
@@ -276,6 +295,13 @@ export function afficherJeu(
     peau.nettoyer(temps, dureeRougeur);
     const sursaut = reglages.nombre('paroi.sursaut');
     const blanchiment = reglages.nombre('vue.blanchiment') / 100;
+    // Le point de fuite suit l'outil, doucement (effet 3D).
+    vue.fond = reglages.nombre('vue.profondeur') / 100;
+    const parallaxe = reglages.nombre('vue.parallaxe') / 100;
+    const [ovx, ovy] = versVue(sim.outil.x, sim.outil.y, { fond: vue.fond, fuiteX: 0, fuiteY: 0 });
+    const kFuite = 1 - Math.exp(-(1 / 60) / 0.25);
+    vue.fuiteX += (-ovx * parallaxe - vue.fuiteX) * kFuite;
+    vue.fuiteY += (-ovy * parallaxe - vue.fuiteY) * kFuite;
     const gl = renduDisponible();
     if (gl) {
       const [sx, sy] = peau.sursaut(temps, sursaut);
@@ -301,9 +327,13 @@ export function afficherJeu(
         arrondi: reglages.nombre('vue.arrondi') / 100,
         contact: reglages.nombre('vue.contact'),
         leve: reglages.nombre('vue.leve') / 100,
+        fond: vue.fond,
+        fuiteX: vue.fuiteX,
+        fuiteY: vue.fuiteY,
+        dechire: reglages.nombre('vue.dechire'),
       });
     }
-    dessiner(ctx, sim, dispo, peau, { temps, dureeRougeur, sursaut, blanchiment, parDessus: !!gl && !gl.perdu });
+    dessiner(ctx, sim, dispo, peau, { temps, dureeRougeur, sursaut, blanchiment, parDessus: !!gl && !gl.perdu, vue, salissureCoton });
     const [bx, by] = centreBocal();
     sorties.dessiner(ctx, temps, dispo.rayon, bx, by);
 

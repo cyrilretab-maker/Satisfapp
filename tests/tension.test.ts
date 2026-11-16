@@ -83,7 +83,14 @@ describe('La casse se sent venir', () => {
         sim.definirCible(cx, cy);
         sim.avancer(IMAGE);
         if (debut < 0 && sim.tension() >= reglages.seuil) debut = sim.temps;
-        if (sim.prendreEvenements().some((e) => e.type === 'lienCasse')) casse = sim.temps;
+        // Seules comptent les déchirures causées par la traction (près de la pince) : loin d'elle,
+        // un bord replié en sac peut céder tout seul (déjà le cas en V1 pendant le tour).
+        const pres = (e: { type: string; lien?: number }) => {
+          if (e.type !== 'lienCasse' || e.lien === undefined) return false;
+          const a = sim.b.lienA[e.lien];
+          return Math.hypot(sim.x[a] - sim.outil.x, sim.y[a] - sim.outil.y) < 0.6;
+        };
+        if (sim.prendreEvenements().some(pres)) casse = sim.temps;
       }
       expect(casse).toBeGreaterThan(0);
       expect(casse - debut).toBeGreaterThanOrEqual(1);

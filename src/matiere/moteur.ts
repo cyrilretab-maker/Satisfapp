@@ -13,9 +13,10 @@
 // Calcul : petits pas de temps fixes (déterministe : mêmes gestes, même résultat),
 // contraintes de distance « XPBD », stables même avec des liens raides.
 
-import type { Bouchon } from './bouchon';
+import { COLLANTE, DURE, MOLLE, type Bouchon } from './bouchon';
+import { Parois } from './parois';
 
-export type TypeOutil = 'pince' | 'spatule';
+export type TypeOutil = 'pince' | 'spatule' | 'coton' | 'aspirateur';
 
 /** Ce qu'il faut garder pour retrouver une partie en cours. */
 export interface EtatSimulation {
@@ -31,6 +32,8 @@ export interface EtatSimulation {
   sortiA: number[];
   morceauxSortis: number[];
   outil: TypeOutil;
+  parois?: string; // V2 : la cire des parois
+  quantite?: number[]; // V2 : ce qui reste de chaque point de cire molle
 }
 
 export interface ParamsMatiere {
@@ -61,6 +64,23 @@ export interface ParamsMatiere {
   inertieOutil: number; // secondes de retard de l'outil quand il ne tient rien
   sousPas: number; // nombre de petits pas de calcul par image
   filsDeCire: boolean; // en se déchirant, la cire laisse des fils (sinon : cassure nette)
+  // V2 : les natures de cire
+  dureRaideur: number; // la cire dure se déforme N fois moins
+  dureCassant: number; // ... et casse pour un allongement N fois plus petit (0..1) : elle résiste puis cède
+  dureColle: number; // sa colle (fond et tour) demande N fois plus de travail
+  collanteColle: number; // la cire collante tient N fois plus au fond et à la paroi
+  collanteEtire: number; // ... et s'étire N fois plus avant de casser (pâte)
+  molleSolidite: number; // la cire molle ne tient presque pas (0..1) ; la pince n'y a pas de prise
+  // V2 : les instruments
+  cotonRayon: number;
+  cotonAbsorbe: number; // distance de frottement du coton-tige pour boire un point de cire molle
+  aspiRayon: number;
+  aspiDebit: number; // cire molle aspirée par seconde (points entiers)
+  aspiMiette: number; // un morceau libre de N points ou moins part dans l'aspirateur
+  paroisCroute: number;
+  paroisCollant: number;
+  paroisLiquide: number;
+  paroisAspiration: number;
 }
 
 export type Evenement =
@@ -71,7 +91,9 @@ export type Evenement =
   | { type: 'tourDecolle'; point: number }
   | { type: 'fondAffaibli'; point: number }
   | { type: 'paroiTouchee'; x: number; y: number }
-  | { type: 'morceauSorti'; points: number; part: number; indices: number[] };
+  | { type: 'morceauSorti'; points: number; part: number; indices: number[] }
+  | { type: 'absorbe'; points: number } // coton-tige ou aspirateur : de la cire molle ou des miettes en moins
+  | { type: 'paroiNettoyee'; quantite: number }; // un peu de cire des parois en moins
 
 // Constantes techniques (pas des sensations) :
 const PAS = 1 / 60; // pas de temps fixe, en secondes
@@ -116,6 +138,16 @@ export class Simulation {
   readonly sortiA: Float64Array;
   /** Numéro de morceau de chaque point (morceau = points reliés entre eux). */
   readonly morceau: Int32Array;
+  /** V2 : la cire collée sur les parois du conduit. */
+  readonly parois: Parois;
+  /** V2 : ce qui reste de chaque point de cire molle (1 = plein, 0 = bu ou aspiré). */
+  readonly quantite: Float64Array;
+  /** V2 : quantité de matière travaillée récemment par l'outil (pour le son), 0..1. */
+  travail = 0;
+  /** Multiplicateurs des liens selon la nature de la cire (recalculés quand les réglages changent). */
+  private lienRaideur: Float64Array;
+  private lienLimite: Float64Array;
+  private paramsCalcules: ParamsMatiere | null = null;
   /** 1 si le morceau tient encore quelque part (fond ou tour). */
   morceauColle: Uint8Array = new Uint8Array(0);
   morceauTaille: Int32Array = new Int32Array(0);
@@ -171,7 +203,51 @@ export class Simulation {
     this.lienOk = new Uint8Array(bouchon.lienA.length).fill(1);
     this.lienPinceFaible = new Uint8Array(bouchon.lienA.length);
     this.lienTenu = new Uint8Array(bouchon.lienA.length);
+    this.parois = new Parois(bouchon.graine, bouchon.params.paroisQuantite ?? 0);
+    this.quantite = new Float64Array(n).fill(1);
+    this.lienRaideur = new Float64Array(bouchon.lienA.length).fill(1);
+    this.lienLimite = new Float64Array(bouchon.lienA.length).fill(1);
     this.calculerMorceaux();
+  }
+
+  /** Les liens prennent la nature de la cire qu'ils relient. */
+  private calculerNatures(): void {
+    if (this.paramsCalcules === this.params) return;
+    this.paramsCalcules = this.params;
+    const p = this.params;
+    const b = this.b;
+    for (let l = 0; l < b.lienA.length; l++) {
+      const na = b.nature[b.lienA[l]];
+      const nb = b.nature[b.lienB[l]];
+      let raideur = 1;
+      let limite = 1;
+      if (na === MOLLE || nb === MOLLE) {
+        raideur = 0.4;
+        limite = p.molleSolidite;
+      } else if (na === COLLANTE || nb === COLLANTE) {
+        limite = p.collanteEtire;
+      } else if (na === DURE && nb === DURE) {
+        raideur = p.dureRaideur;
+        limite = p.dureCassant;
+      } else if (na === DURE || nb === DURE) {
+        raideur = Math.sqrt(p.dureRaideur);
+        limite = Math.sqrt(p.dureCassant);
+      }
+      this.lienRaideur[l] = raideur;
+      this.lienLimite[l] = limite;
+    }
+  }
+
+  /** Combien la colle de ce point demande de travail (fond et tour), selon sa nature. */
+  colleDe(i: number): number {
+    const n = this.b.nature[i];
+    const p = this.params;
+    return this.b.colle[i] * (n === COLLANTE ? p.collanteColle : n === DURE ? p.dureColle : 1);
+  }
+
+  /** V2 : plus de cire au fond ni sur les parois. */
+  toutPropre(seuilParois = 0.03): boolean {
+    return this.pointsRestants() === 0 && this.parois.reste() <= seuilParois;
   }
 
   // ---------- Commandes du doigt ----------
@@ -250,7 +326,8 @@ export class Simulation {
   tension(): number {
     let max = 0;
     for (let l = 0; l < this.b.lienA.length; l++) {
-      if (this.lienOk[l]) max = Math.max(max, this.allongement(l) / this.limite(l));
+      // La cire molle ne craque pas : elle n'entre pas dans la tension ressentie.
+      if (this.lienOk[l] && !this.lienMou(l)) max = Math.max(max, this.allongement(l) / this.limite(l));
     }
     return Math.min(1, max);
   }
@@ -266,7 +343,8 @@ export class Simulation {
   /** Allongement au-delà duquel le lien casse. */
   limite(l: number): number {
     const p = this.params;
-    let limite = p.elasticite * this.b.lienSolidite[l];
+    this.calculerNatures();
+    let limite = p.elasticite * this.b.lienSolidite[l] * this.lienLimite[l];
     if (this.lienPinceFaible[l]) limite *= p.pinceFragilite;
     if (this.lienTenu[l]) limite *= p.pinceRenfort;
     return limite;
@@ -292,6 +370,7 @@ export class Simulation {
   private pas(): void {
     const p = this.params;
     this.temps += PAS;
+    this.calculerNatures();
     this.mettreAJourOutil();
 
     const S = Math.max(1, Math.round(p.sousPas));
@@ -317,7 +396,7 @@ export class Simulation {
         py[i] = y[i];
         let ax = 0;
         let ay = 0;
-        if (b.bord[i] && this.estLibre(i) && p.repli > 0) {
+        if (b.bord[i] && this.estLibre(i) && p.repli > 0 && b.nature[i] !== MOLLE) {
           // Repli en sac : le bord décollé se rétracte vers le centre, jusqu'à une certaine distance.
           const r = Math.hypot(x[i], y[i]) || 1;
           const retrait = Math.hypot(b.x0[i], b.y0[i]) - r;
@@ -338,7 +417,7 @@ export class Simulation {
         const d = Math.hypot(dx, dy);
         if (d < 1e-9) continue;
         const L0 = b.lienLongueur[l];
-        const souplesse = (p.elasticite * L0) / Math.max(1e-6, p.solidite) / h2;
+        const souplesse = (p.elasticite * L0) / Math.max(1e-6, p.solidite * this.lienRaideur[l]) / h2;
         let corr = (d - L0) / (2 + souplesse);
         if (d < L0) corr *= COMPRESSION;
         const ux = dx / d;
@@ -415,7 +494,13 @@ export class Simulation {
   private casser(l: number): void {
     this.lienOk[l] = 0;
     this.morceauxAJour = false;
-    this.evenements.push({ type: 'lienCasse', lien: l });
+    // La cire molle se sépare sans bruit ni secousse (c'est une pâte, pas une cassure).
+    if (!this.lienMou(l)) this.evenements.push({ type: 'lienCasse', lien: l });
+  }
+
+  /** Vrai si le lien touche de la cire molle. */
+  lienMou(l: number): boolean {
+    return this.b.nature[this.b.lienA[l]] === MOLLE || this.b.nature[this.b.lienB[l]] === MOLLE;
   }
 
   /** Tension tenue dans le temps : la colle du fond s'use, puis lâche. */
@@ -432,7 +517,7 @@ export class Simulation {
       const tension = (p.colleRaideur * d) / Math.max(1e-6, p.solidite); // part de la solidité
       const montee = Math.max(0, Math.min(1, (tension - p.colleSeuil) / Math.max(1e-6, p.colleSeuil)));
       if (montee > 0) {
-        this.sante[i] -= (PAS * montee * acceleration) / (Math.max(0.01, p.colleDuree) * b.colle[i]);
+        this.sante[i] -= (PAS * montee * acceleration) / (Math.max(0.01, p.colleDuree) * this.colleDe(i));
       }
       if (this.sante[i] <= 0) this.decoller(i);
     }
@@ -515,8 +600,105 @@ export class Simulation {
         this.fermerPince();
       }
     }
-    if (o.type === 'spatule' && o.vitesse >= p.spatuleMouvement) this.spatuler(deplacement);
+    const bouge = o.vitesse >= p.spatuleMouvement;
+    let travail = 0;
+    if (o.type === 'spatule' && bouge) {
+      this.spatuler(deplacement);
+      travail += this.parois.travailler('spatule', o.x, o.y, p.spatuleRayon, deplacement, PAS, this.paramsParois());
+    }
+    if (o.type === 'coton' && bouge) {
+      travail += this.absorber(deplacement);
+      travail += this.parois.travailler('coton', o.x, o.y, p.cotonRayon, deplacement, PAS, this.paramsParois());
+    }
+    if (o.type === 'aspirateur') {
+      travail += this.aspirer();
+      travail += this.parois.travailler('aspirateur', o.x, o.y, p.aspiRayon, deplacement, PAS, this.paramsParois());
+    }
+    if (travail > 0) this.evenements.push({ type: 'paroiNettoyee', quantite: travail });
+    this.travail += (Math.min(1, travail * 20) - this.travail) * (1 - Math.exp(-PAS / 0.12));
     this.verifierParoi();
+  }
+
+  private paramsParois() {
+    const p = this.params;
+    return { croute: p.paroisCroute, collant: p.paroisCollant, liquide: p.paroisLiquide, aspiration: p.paroisAspiration };
+  }
+
+  /** Le coton-tige boit la cire molle sous sa pointe quand il frotte. */
+  private absorber(deplacement: number): number {
+    const o = this.outil;
+    const p = this.params;
+    let bu = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.sorti[i] || this.b.nature[i] !== MOLLE) continue;
+      const d = Math.hypot(this.x[i] - o.x, this.y[i] - o.y);
+      if (d > p.cotonRayon) continue;
+      this.quantite[i] -= (deplacement / Math.max(1e-4, p.cotonAbsorbe)) * (1 - d / p.cotonRayon);
+      if (this.quantite[i] <= 0) {
+        this.retirerPoint(i);
+        bu++;
+      }
+    }
+    if (bu > 0) this.evenements.push({ type: 'absorbe', points: bu });
+    return bu * 0.01;
+  }
+
+  /** L'aspirateur : la cire molle part peu à peu, les petits morceaux libres d'un coup. */
+  private aspirer(): number {
+    const o = this.outil;
+    const p = this.params;
+    if (!o.doigt) return 0;
+    let parti = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.sorti[i] || this.b.nature[i] !== MOLLE) continue;
+      const d = Math.hypot(this.x[i] - o.x, this.y[i] - o.y);
+      if (d > p.aspiRayon) continue;
+      this.quantite[i] -= PAS * p.aspiDebit * (1.5 - d / p.aspiRayon);
+      if (this.quantite[i] <= 0) {
+        this.retirerPoint(i);
+        parti++;
+      }
+    }
+    // Les miettes libres (petits morceaux qui ne tiennent plus à rien) partent d'un coup.
+    if (!this.morceauxAJour) this.calculerMorceaux();
+    const aspires = new Set<number>();
+    for (let i = 0; i < this.n; i++) {
+      if (this.sorti[i]) continue;
+      const m = this.morceau[i];
+      if (m < 0 || aspires.has(m) || this.morceauColle[m] || this.morceauTaille[m] > p.aspiMiette) continue;
+      if (Math.hypot(this.x[i] - o.x, this.y[i] - o.y) <= p.aspiRayon) aspires.add(m);
+    }
+    if (aspires.size > 0) {
+      for (let i = 0; i < this.n; i++) {
+        if (!this.sorti[i] && aspires.has(this.morceau[i])) {
+          this.retirerPoint(i);
+          parti++;
+        }
+      }
+    }
+    if (parti > 0) {
+      this.evenements.push({ type: 'absorbe', points: parti });
+      this.calculerMorceaux();
+    }
+    return parti * 0.01;
+  }
+
+  /** Un point de cire bu ou aspiré : il quitte la vue sans passer par le bocal. */
+  private retirerPoint(i: number): void {
+    this.sorti[i] = 1;
+    this.sortiA[i] = this.temps;
+    this.quantite[i] = 0;
+    const b = this.b;
+    for (let k = b.voisinsDebut[i]; k < b.voisinsDebut[i + 1]; k++) this.lienOk[b.voisinsLien[k]] = 0;
+    this.morceauxAJour = false;
+    const o = this.outil;
+    if (o.ferme && o.prise.includes(i)) {
+      const garder = o.prise.map((j, q) => ({ j, q })).filter(({ j }) => j !== i);
+      o.decalX = garder.map(({ q }) => o.decalX[q]);
+      o.decalY = garder.map(({ q }) => o.decalY[q]);
+      o.prise = garder.map(({ j }) => j);
+      if (o.prise.length === 0) this.ouvrirPince();
+    }
   }
 
   /**
@@ -532,13 +714,13 @@ export class Simulation {
       if (this.colleAuTour[i]) {
         // Le tour : décollé point par point, à partir d'un bord libre.
         if (!this.aCoteDUnBordLibre(i)) continue;
-        this.santeTour[i] -= deplacement / Math.max(1e-4, p.tourColle);
+        this.santeTour[i] -= deplacement / Math.max(1e-4, p.tourColle * (this.colleDe(i) / this.b.colle[i]));
         if (this.santeTour[i] <= 0) this.decollerTour(i);
       } else if (this.colleAuFond[i] && this.sante[i] > plancher) {
         // Plus profond : la spatule s'enfonce sous la cire et affaiblit la colle du fond,
         // de proche en proche, à partir de ce qui est déjà libre ou affaibli.
         if (!this.accessibleSousLaCire(i)) continue;
-        this.sante[i] -= deplacement / (Math.max(1e-4, p.tourColle * p.spatuleFond) * this.b.colle[i]);
+        this.sante[i] -= deplacement / (Math.max(1e-4, p.tourColle * p.spatuleFond) * this.colleDe(i));
         if (this.sante[i] <= plancher) {
           this.sante[i] = plancher;
           this.evenements.push({ type: 'fondAffaibli', point: i });
@@ -562,6 +744,7 @@ export class Simulation {
 
   /** Vrai si la pince peut tenir ce point franchement : libre, ou colle du fond assez affaiblie. */
   estPrenable(i: number): boolean {
+    if (this.b.nature[i] === MOLLE) return false; // la pince glisse dans la cire molle
     if (this.estLibre(i)) return true;
     return !this.colleAuTour[i] && this.colleAuFond[i] === 1 && this.sante[i] <= this.params.prisePossible;
   }
@@ -586,10 +769,14 @@ export class Simulation {
     const p = this.params;
     if (o.vitesse < p.spatuleMouvement || this.temps - this.dernierContact < ENTRE_DEUX_CONTACTS) return;
     let touche = false;
-    if (o.type === 'spatule') {
+    const surLaParoi = Math.hypot(o.x, o.y) > RAYON_PAROI;
+    if (o.type === 'coton') {
+      touche = false; // le coton-tige est doux
+    } else if (surLaParoi) {
+      // Sur la paroi du conduit : on la sent si elle est propre à cet endroit (rien à racler).
+      touche = (o.type !== 'pince' || !o.ferme) && this.parois.saleteEn(o.x, o.y) < 0.05;
+    } else if (o.type === 'spatule' || o.type === 'aspirateur') {
       touche = this.distanceALaMatiere(o.x, o.y) > p.margeParoi;
-    } else if (!o.ferme) {
-      touche = Math.hypot(o.x, o.y) > RAYON_PAROI;
     }
     if (touche) {
       this.dernierContact = this.temps;
@@ -619,7 +806,7 @@ export class Simulation {
     let plusProche = -1;
     let dMin = Infinity;
     for (let i = 0; i < this.n; i++) {
-      if (this.sorti[i]) continue;
+      if (this.sorti[i] || this.b.nature[i] === MOLLE) continue;
       const d = Math.hypot(this.x[i] - o.x, this.y[i] - o.y);
       if (d <= p.pinceRayon) proches.push(i);
       if (d < dMin) {
@@ -627,7 +814,15 @@ export class Simulation {
         plusProche = i;
       }
     }
-    if (proches.length === 0) return; // rien sous la pince : elle reste ouverte
+    if (proches.length === 0) {
+      // Rien à tenir : sur la paroi, la pince ramasse au moins les miettes sous ses mors.
+      const ramasse = this.parois.travailler('pince', o.x, o.y, p.pinceRayon, 0, PAS, this.paramsParois());
+      if (ramasse > 0) {
+        this.evenements.push({ type: 'paroiNettoyee', quantite: ramasse });
+        this.evenements.push({ type: 'pinceFermee', faible: true });
+      }
+      return; // rien sous la pince : elle reste ouverte
+    }
 
     // La pince ne tient bien que ce qui est décollé.
     const libres = proches.filter((i) => this.estPrenable(i));
@@ -723,6 +918,8 @@ export class Simulation {
       sortiA: arrondi(this.sortiA),
       morceauxSortis: [...this.morceauxSortis],
       outil: this.outil.type,
+      parois: this.parois.exporter(),
+      quantite: arrondi(this.quantite),
     };
   }
 
@@ -751,6 +948,8 @@ export class Simulation {
     this.morceauxSortis.length = 0;
     this.morceauxSortis.push(...e.morceauxSortis);
     this.outil.type = e.outil;
+    if (e.parois) this.parois.importer(e.parois);
+    if (e.quantite && e.quantite.length === n) this.quantite.set(e.quantite);
     this.calculerMorceaux();
     return true;
   }

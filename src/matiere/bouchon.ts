@@ -15,7 +15,19 @@ export interface ParamsBouchon {
   irregulariteCire: number; // variation de solidité d'un lien à l'autre (0..1)
   entreesNombre: number; // endroits du tour à peine décollés, pour commencer
   entreesTaille: number; // nombre de points du bord dans chaque point d'entrée
+  // V2 : la cire n'est pas la même partout.
+  duresNombre?: number; // taches de cire très dure (sèche, cassante, qui résiste)
+  collantesNombre?: number; // taches de cire très collante (pâte, chewing-gum)
+  mollesNombre?: number; // taches de cire molle, presque liquide
+  naturesTaille?: number; // taille d'une tache (part du rayon du bouchon)
+  paroisQuantite?: number; // V2-3 : quantité de cire collée sur les parois du conduit (0..1)
 }
+
+/** Les natures de cire. */
+export const COMPACTE = 0;
+export const DURE = 1;
+export const COLLANTE = 2;
+export const MOLLE = 3;
 
 export interface Bouchon {
   graine: number;
@@ -37,6 +49,7 @@ export interface Bouchon {
   voisinsDebut: Int32Array; // voisins du point i : voisins[voisinsDebut[i] .. voisinsDebut[i+1]]
   voisins: Int32Array;
   voisinsLien: Int32Array; // le lien qui mène à chaque voisin
+  nature: Uint8Array; // COMPACTE, DURE, COLLANTE ou MOLLE, par point
 }
 
 const BANDE_ZONE_FAIBLE = 0.55; // largeur d'une zone faible, en distance entre points
@@ -220,9 +233,39 @@ export function genererBouchon(graine: number, p: ParamsBouchon): Bouchon {
     }
   }
 
+  // 9. (V2) Les natures : des taches de cire dure, collante ou molle dans la cire compacte.
+  // Tirées en dernier : les bouchons d'avant gardent exactement leur forme.
+  const nature = new Uint8Array(n);
+  const taches2: { x: number; y: number; r: number; nature: number }[] = [];
+  const ajouter = (nb: number | undefined, quoi: number) => {
+    for (let k = 0; k < Math.round(nb ?? 0); k++) {
+      const angle = hasard() * Math.PI * 2;
+      const dist = Math.sqrt(hasard()) * p.taille * 0.8;
+      const r = p.taille * (p.naturesTaille ?? 0.3) * (0.6 + hasard() * 0.8);
+      taches2.push({ x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, r, nature: quoi });
+    }
+  };
+  ajouter(p.duresNombre, DURE);
+  ajouter(p.collantesNombre, COLLANTE);
+  ajouter(p.mollesNombre, MOLLE);
+  for (let k = 0; k < n; k++) {
+    let meilleure = 0.45; // en dessous : cire compacte ordinaire
+    for (const t of taches2) {
+      // Un bord de tache irrégulier : on bruite la distance avec l'angle.
+      const a = Math.atan2(ys[k] - t.y, xs[k] - t.x);
+      const r = t.r * (1 + 0.25 * Math.sin(3 * a + t.x * 9) + 0.15 * Math.sin(5 * a + t.y * 7));
+      const influence = Math.exp(-(((xs[k] - t.x) ** 2 + (ys[k] - t.y) ** 2) / (r * r)));
+      if (influence > meilleure) {
+        meilleure = influence;
+        nature[k] = t.nature;
+      }
+    }
+  }
+
   return {
     graine,
     params: { ...p },
+    nature,
     nbPoints: n,
     x0: Float64Array.from(xs),
     y0: Float64Array.from(ys),

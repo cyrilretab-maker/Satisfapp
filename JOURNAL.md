@@ -4,7 +4,7 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
-- **En cours : V2 « réalisme et fluidité » (demande de Cyril, 2026-11-16).** Dessin par la puce graphique (WebGL 2) construit et en ligne : en attente de son avis à l'œil sur le téléphone.
+- **V2 (lots V2-1 à V2-4) : construite d'une traite à la demande de Cyril (2026-11-16), testée automatiquement, en ligne. En attente de son retour au doigt et à l'œil.**
 - **Lot 6 (essai en situation réelle) :** mené par Cyril lui-même.
 - **Lots 3, 4 et 5 — Tension, habillage, bocal : VALIDÉS** par Cyril le 2026-11-16.
   - [x] Lot 3 : Cyril sent venir la casse les yeux fermés (au doigt simulé : les pulsations commencent plus d'une seconde avant la première déchirure, sur 4 bouchons).
@@ -91,8 +91,8 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - `src/reglages/defauts.json` : **toutes** les valeurs de sensation et leurs bornes. Le panneau se construit tout seul à partir de ce fichier (types : curseur, interrupteur, choix).
 - `src/reglages/reglages.ts` : lit le fichier, garde sur le téléphone seulement ce que Cyril a modifié.
 - `src/reglages/panneau.ts` : panneau caché (trois appuis en haut à droite) ; la page en cours peut y ajouter des actions (Nouveau bouchon, Rejouer le même bouchon).
-- `src/matiere/` : **le moteur, sans écran.** `bouchon.ts` fabrique un bouchon à partir d'un numéro de tirage ; `moteur.ts` applique les règles (liens qui cassent au pic, colle du fond qui s'use sous tension modérée, colle du tour, spatule, pince, repli, paroi) ; `parametres.ts` traduit les réglages pour le moteur.
-- `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (pavé tactile), `rendu-gl.ts` (dessin réaliste par la puce graphique : peau et cire), `bruit.ts` (texture de grain), `dessin.ts` (outils, bord de la vue, zone du pouce ; et dessin simple de secours), `peau.ts` (rougeurs et sursaut), `bocal.ts` (bocal), `sortie.ts` (morceaux qui volent vers le bocal), `sauvegarde.ts` (reprise de partie).
+- `src/matiere/` : **le moteur, sans écran.** `bouchon.ts` fabrique un bouchon à partir d'un numéro de tirage ; `parois.ts` (V2 : la cire des parois) ; `moteur.ts` applique les règles (liens qui cassent au pic, colle du fond qui s'use sous tension modérée, colle du tour, spatule, pince, repli, paroi) ; `parametres.ts` traduit les réglages pour le moteur.
+- `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (pavé tactile), `rendu-gl.ts` (dessin réaliste par la puce graphique : conduit, tympan, cire des parois, bouchon), `perspective.ts` (le conduit en profondeur), `bruit.ts` (texture de grain), `dessin.ts` (outils, bord de la vue, zone du pouce ; et dessin simple de secours), `peau.ts` (rougeurs et sursaut), `bocal.ts` (bocal), `sortie.ts` (morceaux qui volent vers le bocal), `sauvegarde.ts` (reprise de partie).
 - `src/pages/` : page de lancement, page du bouchon (`jeu.ts`), page de test vibration et son.
 - `src/sensations/` : couche vibration (remplaçable par Capacitor), `tension.ts` (pilote : pulsations, craquements, silences), `sons-matiere.ts` (sons fabriqués), `parametres-sensations.ts`, motifs de rythme du lot 0.
 - `tests/` : tests automatiques (`npm test`). `tests/outils/doigt-simule.ts` = le doigt simulé.
@@ -100,7 +100,7 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - Outils : Vite 8, TypeScript 7, Vitest 5, vite-plugin-pwa 2. Pas de PixiJS. Peau et cire en WebGL 2 (accord de Cyril, 2026-11-16), le reste en Canvas 2D ; si WebGL 2 manque ou lâche, tout repasse en Canvas 2D.
 - La page de jeu expose `window.satisfapp` (simulation en cours) pour les vérifications automatiques.
 
-## Plan V2 proposé à Cyril (2026-11-16, en attente de son accord)
+## Plan V2 (accepté par Cyril le 2026-11-16 : « fais toute la V2 d'un coup de 1 à 4 »)
 
 Demande de Cyril : de la profondeur **dans le conduit** (tunnel en perspective) ; la cire collée sur les parois près de l'entrée, qui s'amasse en bouchon au fond ; une matière moins « goutte qui coule » : moins brillante/miel, bords arrachés (pas ronds), moins élastique, texture compacte ; des parties liquides, d'autres très dures, d'autres très collantes ; plusieurs instruments à tour de rôle pour tout nettoyer et retrouver une oreille propre.
 
@@ -112,6 +112,16 @@ Principe technique proposé : la matière reste calculée « à plat » (ce qui 
 - **V2-4 — Les instruments à tour de rôle** : coton-tige (absorbe le mou/liquide, essuie la paroi), aspirateur (liquide et miettes), spatule (décolle le dur et le collant), pince (sort les morceaux) ; fin = oreille propre et belle.
 
 ## Historique
+
+### 2026-11-16 — V2 construite (lots V2-1 à V2-4)
+- **Principe** : la matière reste calculée à plat (sensation au doigt inchangée) : le fond est le disque de rayon 0,95 (le bouchon), la paroi est l'anneau 0,95 → 1,35 « déroulé ». L'image replie l'anneau en tunnel (`src/jeu/perspective.ts`, même calcul dans le dessin par la puce graphique).
+- **V2-1 Conduit** : tunnel en perspective, lumière qui faiblit vers le fond, creux au pied de la paroi, tympan nacré au fond (reflet en triangle, manche du marteau) qui apparaît en nettoyant ; point de fuite qui suit l'outil (effet 3D) ; outils en perspective (pointe petite au fond, tige qui grossit vers la caméra). Le pouce garde la même vitesse à l'écran malgré le fond plus petit.
+- **V2-2 Cire** : mate, brun-orangé, en couches et grumeaux, bords arrachés (contour bruité dans la cire). Trois natures en taches dans la cire compacte : **dure** (brun foncé, éclats, 4× plus raide, casse à 55 % de l'étirement, colle 1,5×), **collante** (brun profond, un peu luisante, colle 3× au fond et à la paroi, s'étire 1,4×), **molle** (ocre mouillé, solidité 30 %, la pince glisse dessus, se sépare sans craquement ni vibration). Défauts d'image : brillance 0,3, finesse des reflets 30, douceur 0,6, transparence 15 %.
+- **V2-3 Parois** : `src/matiere/parois.ts` : cases (128 autour × 32 en profondeur) avec plaques sèches (croûte), traînées collantes, cire humide, miettes ; de plus en plus épais vers le fond. Spatule : racle la croûte (qui devient des miettes), use le collant ; coton-tige : boit l'humide, emporte le collant et des miettes ; aspirateur : humide et miettes ; pince : ramasse les miettes. Frotter une paroi **propre** (spatule, pince ouverte, aspirateur) se remarque ; le coton-tige est doux.
+- **V2-4 Instruments** : 4 boutons (Spatule, Pince, Coton-tige, Aspirateur). Coton-tige : boit la cire molle du bouchon en frottant, et jaunit (un neuf à chaque fois qu'on le reprend). Aspirateur : doigt posé = il aspire la cire molle (même collée) et avale d'un coup les miettes libres (≤ 10 points). Fin de partie : plus rien au fond **et** parois propres (reste < 3 %).
+- Réglages ajoutés : groupes « Natures de cire », « Cire sur les parois du conduit », « Coton-tige et aspirateur », et dans « Image » : taille du fond (profondeur), effet 3D, bords arrachés.
+- Choix de règle à faire valider : un bord replié peut céder tout seul loin de la pince (déjà le cas en V1) ; le test « la casse se sent venir » ne compte plus que les déchirures près de la pince.
+- Dessin ≈ 0,4 ms et physique ≈ 0,5 ms par image sur ordinateur. Le dessin simple de secours suit la perspective mais ne montre pas la cire des parois. 84 tests.
 
 ### 2026-11-16 — V2 : la profondeur du bouchon
 - Cyril : « c'est super », puis « rajouter de la profondeur comme un vrai bouchon de cérumen ».

@@ -4,6 +4,7 @@
 import { RAYON_PAROI, type Simulation } from '../matiere/moteur';
 import type { Disposition } from './ecran';
 import type { Peau } from './peau';
+import { echelleLocale, versVue, type Vue3D } from './perspective';
 
 const COULEURS = {
   page: '#141010',
@@ -35,6 +36,10 @@ export interface OptionsDessin {
   /** Vrai quand la peau et la cire sont déjà dessinées par la puce graphique (rendu-gl.ts) :
    * on ne dessine alors que ce qui vient par-dessus (outils, bord de la vue, zone du pouce). */
   parDessus?: boolean;
+  /** V2 : le conduit en profondeur. */
+  vue: Vue3D;
+  /** V2 : le coton-tige se salit à mesure qu'il boit la cire (0..1). */
+  salissureCoton?: number;
 }
 
 export function dessiner(
@@ -62,12 +67,25 @@ export function dessiner(
   ctx.clip();
   if (!o.parDessus) dessinerPeauEtCire(ctx, sim, peau, o, cx, cy, R);
 
-  // 8. L'outil, éclairé par la caméra (position lissée entre deux pas de calcul).
+  // 8. L'outil, vu en perspective : petit au fond, sa tige grossit en venant vers la caméra.
   const a = sim.fractionDePas();
-  const ox = cx + (sim.outilAvant.x + (sim.outil.x - sim.outilAvant.x) * a) * R;
-  const oy = cy + (sim.outilAvant.y + (sim.outil.y - sim.outilAvant.y) * a) * R;
-  if (sim.outil.type === 'spatule') dessinerSpatule(ctx, ox, oy, R);
-  else dessinerPince(ctx, ox, oy, sim.outil.ferme, R);
+  const mx = sim.outilAvant.x + (sim.outil.x - sim.outilAvant.x) * a;
+  const my = sim.outilAvant.y + (sim.outil.y - sim.outilAvant.y) * a;
+  const [vx, vy] = versVue(mx, my, o.vue);
+  const ox = cx + vx * R;
+  const oy = cy + vy * R;
+  const taille = R * echelleLocale(mx, my, o.vue); // pixels par unité de matière, là où est la pointe
+  // La tige sort de la vue vers le bas à droite (là où se tient la main).
+  let ex = vx * 0.35 + MANCHE[0];
+  let ey = vy * 0.35 + MANCHE[1];
+  const en = Math.hypot(ex, ey) || 1;
+  ex = cx + (ex / en) * R * 1.15;
+  ey = cy + (ey / en) * R * 1.15;
+  const outil = sim.outil.type;
+  if (outil === 'spatule') dessinerSpatule(ctx, ox, oy, ex, ey, taille, R);
+  else if (outil === 'pince') dessinerPince(ctx, ox, oy, ex, ey, sim.outil.ferme, taille, R);
+  else if (outil === 'coton') dessinerCoton(ctx, ox, oy, ex, ey, taille, R, o.salissureCoton ?? 0);
+  else dessinerAspirateur(ctx, ox, oy, ex, ey, taille, R, sim.outil.doigt, o.temps);
 
   // 9. Le bord sombre de l'endoscope (vignettage).
   const vignette = ctx.createRadialGradient(cx, cy, R * 0.62, cx, cy, R);
@@ -105,8 +123,9 @@ function dessinerPeauEtCire(
   ctx.fillStyle = peauDegrade;
   ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
 
-  const X = (i: number) => cx + sim.x[i] * R;
-  const Y = (i: number) => cy + sim.y[i] * R;
+  const vue = o.vue;
+  const X = (i: number) => cx + versVue(sim.x[i], sim.y[i], vue)[0] * R;
+  const Y = (i: number) => cy + versVue(sim.x[i], sim.y[i], vue)[1] * R;
   const b = sim.b;
 
   // 2. La peau dégagée s'éclaircit peu à peu, là où le bouchon était.
@@ -114,8 +133,8 @@ function dessinerPeauEtCire(
   for (let i = 0; i < sim.n; i++) {
     if (!sim.sorti[i]) continue;
     const k = Math.min(1, (sim.temps - sim.sortiA[i]) / DUREE_ECLAIRCISSEMENT);
-    const gx = cx + b.x0[i] * R;
-    const gy = cy + b.y0[i] * R;
+    const gx = cx + versVue(b.x0[i], b.y0[i], vue)[0] * R;
+    const gy = cy + versVue(b.x0[i], b.y0[i], vue)[1] * R;
     const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, tailleTache);
     g.addColorStop(0, `rgba(${COULEURS.peauPropre}, ${0.28 * k})`);
     g.addColorStop(1, `rgba(${COULEURS.peauPropre}, 0)`);
@@ -127,8 +146,8 @@ function dessinerPeauEtCire(
   for (const r of peau.rougeurs) {
     const force = peau.intensite(r, o.temps, o.dureeRougeur);
     if (force <= 0) continue;
-    const gx = cx + r.x * R;
-    const gy = cy + r.y * R;
+    const gx = cx + versVue(r.x, r.y, vue)[0] * R;
+    const gy = cy + versVue(r.x, r.y, vue)[1] * R;
     const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, R * 0.12);
     g.addColorStop(0, `rgba(${COULEURS.rougeur}, ${0.5 * force})`);
     g.addColorStop(1, `rgba(${COULEURS.rougeur}, 0)`);
@@ -144,7 +163,7 @@ function dessinerPeauEtCire(
   const visible = new Uint8Array(nt);
   // Chaque point de matière est aussi un petit disque : aux déchirures, la cire reste visible
   // des deux côtés (rien ne « disparaît »), et une miette isolée se voit.
-  const rayonPoint = R * b.params.finesse * 0.5;
+  const rayonPoint = R * vue.fond * b.params.finesse * 0.5;
   for (let i = 0; i < sim.n; i++) {
     if (sim.sorti[i]) continue;
     const ch = chemins[Math.round((1 - tient(i)) * 6)];
@@ -254,44 +273,149 @@ function dessinerPave(ctx: CanvasRenderingContext2D, d: Disposition): void {
 
 const MANCHE: [number, number] = [0.45, 0.89]; // direction du manche (vers le bas, un peu à droite)
 
-/** Trace une tige métallique : ombre portée, corps, reflet. */
-function tige(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, epaisseur: number): void {
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = COULEURS.outilOmbre;
-  ctx.lineWidth = epaisseur + 2;
-  ctx.beginPath();
-  ctx.moveTo(x1 + 2, y1 + 3);
-  ctx.lineTo(x2 + 2, y2 + 3);
-  ctx.stroke();
-  ctx.strokeStyle = COULEURS.outil;
-  ctx.lineWidth = epaisseur;
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-  ctx.lineWidth = Math.max(1, epaisseur * 0.3);
-  ctx.beginPath();
-  ctx.moveTo(x1 - 1, y1 - 1);
-  ctx.lineTo(x2 - 1, y2 - 1);
-  ctx.stroke();
+/** Une tige vue en perspective : fine au fond (x1, y1), épaisse vers la caméra (x2, y2). */
+function tigeConique(
+  ctx: CanvasRenderingContext2D,
+  x1: number,
+  y1: number,
+  e1: number,
+  x2: number,
+  y2: number,
+  e2: number,
+  couleur = COULEURS.outil,
+): void {
+  const L = Math.hypot(x2 - x1, y2 - y1) || 1;
+  const nx = -(y2 - y1) / L;
+  const ny = (x2 - x1) / L;
+  const contour = (dx: number, dy: number, k: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x1 + nx * e1 * k + dx, y1 + ny * e1 * k + dy);
+    ctx.lineTo(x2 + nx * e2 * k + dx, y2 + ny * e2 * k + dy);
+    ctx.lineTo(x2 - nx * e2 * k + dx, y2 - ny * e2 * k + dy);
+    ctx.lineTo(x1 - nx * e1 * k + dx, y1 - ny * e1 * k + dy);
+    ctx.closePath();
+  };
+  ctx.fillStyle = COULEURS.outilOmbre;
+  contour(2, 3, 0.6);
+  ctx.fill();
+  const g = ctx.createLinearGradient(x2 + nx * e2, y2 + ny * e2, x2 - nx * e2, y2 - ny * e2);
+  g.addColorStop(0, '#8a9094');
+  g.addColorStop(0.35, couleur);
+  g.addColorStop(0.5, '#ffffff');
+  g.addColorStop(1, '#7d8387');
+  ctx.fillStyle = g;
+  contour(0, 0, 0.5);
+  ctx.fill();
 }
 
-/** Une pince vue de face : deux mors qui viennent d'en bas à droite. Ouverte ou fermée. */
-function dessinerPince(ctx: CanvasRenderingContext2D, x: number, y: number, ferme: boolean, R: number): void {
-  const longueur = R * 0.22;
-  const [dx, dy] = MANCHE;
+/** Une pince : deux mors fins au bout, une tige qui vient vers la caméra. */
+function dessinerPince(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  ex: number,
+  ey: number,
+  ferme: boolean,
+  taille: number,
+  R: number,
+): void {
+  const L = Math.hypot(ex - x, ey - y) || 1;
+  const [dx, dy] = [(ex - x) / L, (ey - y) / L];
   const [nx, ny] = [-dy, dx];
-  const ouverture = ferme ? R * 0.006 : R * 0.035;
-  const e = Math.max(2, R * 0.016);
-  for (const s of [-1, 1]) tige(ctx, x + nx * ouverture * s, y + ny * ouverture * s, x + dx * longueur, y + dy * longueur, e);
-  tige(ctx, x + dx * longueur, y + dy * longueur, x + dx * R * 2, y + dy * R * 2, e * 1.3);
+  const longueur = taille * 0.24;
+  const ouverture = ferme ? taille * 0.006 : taille * 0.04;
+  const e = Math.max(1.5, taille * 0.02);
+  const [jx, jy] = [x + dx * longueur, y + dy * longueur];
+  for (const s of [-1, 1]) tigeConique(ctx, x + nx * ouverture * s, y + ny * ouverture * s, e, jx + nx * e * 0.8 * s, jy + ny * e * 0.8 * s, e * 1.2);
+  tigeConique(ctx, jx, jy, e * 1.6, ex, ey, Math.max(8, R * 0.06));
 }
 
 /** Une spatule : une petite lame plate et arrondie au bout d'une tige fine. */
-function dessinerSpatule(ctx: CanvasRenderingContext2D, x: number, y: number, R: number): void {
-  const [dx, dy] = MANCHE;
-  const lame = R * 0.09;
-  tige(ctx, x + dx * lame, y + dy * lame, x + dx * R * 2, y + dy * R * 2, Math.max(2, R * 0.014));
-  tige(ctx, x, y, x + dx * lame, y + dy * lame, Math.max(5, R * 0.045));
+function dessinerSpatule(ctx: CanvasRenderingContext2D, x: number, y: number, ex: number, ey: number, taille: number, R: number): void {
+  const L = Math.hypot(ex - x, ey - y) || 1;
+  const [dx, dy] = [(ex - x) / L, (ey - y) / L];
+  const lame = taille * 0.1;
+  tigeConique(ctx, x + dx * lame, y + dy * lame, Math.max(1.2, taille * 0.012), ex, ey, Math.max(6, R * 0.045));
+  tigeConique(ctx, x, y, Math.max(3, taille * 0.05), x + dx * lame, y + dy * lame, Math.max(2, taille * 0.03));
+}
+
+/** Un coton-tige : une boule de coton blanc (qui jaunit en buvant la cire) au bout d'un bâtonnet. */
+function dessinerCoton(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  ex: number,
+  ey: number,
+  taille: number,
+  R: number,
+  sale: number,
+): void {
+  const L = Math.hypot(ex - x, ey - y) || 1;
+  const [dx, dy] = [(ex - x) / L, (ey - y) / L];
+  const r = Math.max(5, taille * 0.09);
+  tigeConique(ctx, x + dx * r, y + dy * r, Math.max(1.5, taille * 0.02), ex, ey, Math.max(7, R * 0.05), '#f2f2f0');
+  const angle = Math.atan2(dy, dx);
+  ctx.save();
+  ctx.translate(x + dx * r * 0.4, y + dy * r * 0.4);
+  ctx.rotate(angle);
+  const k = Math.min(1, sale);
+  const blanc = [248, 246, 240];
+  const cire = [176, 120, 48];
+  const c = blanc.map((v, i) => Math.round(v + (cire[i] - v) * k * 0.85));
+  const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.3);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.6, `rgb(${c[0]}, ${c[1]}, ${c[2]})`);
+  g.addColorStop(1, `rgb(${Math.round(c[0] * 0.8)}, ${Math.round(c[1] * 0.78)}, ${Math.round(c[2] * 0.75)})`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.5, r, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Quelques fibres qui dépassent.
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 0.7;
+  for (let k2 = 0; k2 < 9; k2++) {
+    const a = (k2 / 9) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 1.4, Math.sin(a) * r * 0.95);
+    ctx.lineTo(Math.cos(a + 0.2) * r * 1.65, Math.sin(a + 0.2) * r * 1.1);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** L'aspirateur : un tube fin au bout ouvert ; quand il aspire, l'embout tremble un peu. */
+function dessinerAspirateur(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  ex: number,
+  ey: number,
+  taille: number,
+  R: number,
+  actif: boolean,
+  temps: number,
+): void {
+  if (actif) {
+    x += Math.sin(temps * 90) * 0.6;
+    y += Math.cos(temps * 70) * 0.6;
+  }
+  const r = Math.max(3, taille * 0.035);
+  tigeConique(ctx, x, y, r, ex, ey, Math.max(9, R * 0.065), '#c9ced2');
+  ctx.fillStyle = 'rgba(20, 14, 12, 0.9)';
+  ctx.beginPath();
+  ctx.ellipse(x, y, r * 0.75, r * 0.55, Math.atan2(ey - y, ex - x), 0, Math.PI * 2);
+  ctx.fill();
+  if (actif) {
+    // Un léger souffle : la cire autour est tirée vers l'embout.
+    ctx.strokeStyle = 'rgba(255, 240, 210, 0.25)';
+    ctx.lineWidth = 1;
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + temps * 3;
+      const d = r * (2.2 + ((temps * 4 + k * 0.37) % 1) * 1.5);
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a) * d, y + Math.sin(a) * d);
+      ctx.lineTo(x + Math.cos(a) * d * 0.55, y + Math.sin(a) * d * 0.55);
+      ctx.stroke();
+    }
+  }
 }
