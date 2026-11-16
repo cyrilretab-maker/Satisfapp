@@ -4,10 +4,11 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
-- **Lots 3, 4 et 5 : construits d'une traite à la demande de Cyril (2026-11-16), testés automatiquement, mis en ligne. En attente de son test au doigt et à l'œil.**
-  - [ ] Lot 3 : Cyril sent venir la casse les yeux fermés (au doigt simulé : les pulsations commencent plus d'une seconde avant la première déchirure, sur 4 bouchons).
-  - [ ] Lot 4 : l'écran rappelle les captures de référence, sans paraître sale ni choquant.
-  - [ ] Lot 5 : une partie complète s'enchaîne sans bouton inutile.
+- **Prochaine étape : lot 6 (essai en situation réelle, mené par Cyril lui-même).** Rien à construire avant son retour.
+- **Lots 3, 4 et 5 — Tension, habillage, bocal : VALIDÉS** par Cyril le 2026-11-16.
+  - [x] Lot 3 : Cyril sent venir la casse les yeux fermés (au doigt simulé : les pulsations commencent plus d'une seconde avant la première déchirure, sur 4 bouchons).
+  - [x] Lot 4 : l'écran rappelle les captures de référence, sans paraître sale ni choquant.
+  - [x] Lot 5 : une partie complète s'enchaîne sans bouton inutile.
 - **Lot 2 — Spatule et paroi : VALIDÉ** par Cyril le 2026-11-16.
   - [x] Impossible de sortir un gros morceau sans avoir fait le tour.
   - [x] Toucher la paroi se remarque sans punir.
@@ -99,6 +100,9 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - La page de jeu expose `window.satisfapp` (simulation en cours) pour les vérifications automatiques.
 
 ## Historique
+
+### 2026-11-16 — Lots 3, 4 et 5 validés
+- Cyril : « Oui, tout validé ». Il reste le lot 6, qu'il mène lui-même.
 
 ### 2026-11-16 — Retours de Cyril sur les lots 3 à 5
 - « Ça s'effrite, trop de matière disparaît » : à chaque déchirure, les triangles abîmés n'étaient plus dessinés (une bande de cire disparaissait à l'écran). Désormais chaque point de matière est aussi dessiné comme un petit disque : la cire reste visible des deux côtés d'une déchirure, et les miettes se voient. Zones faibles moins fragiles (30 → 45 %), cire plus régulière (15 → 10 %).
