@@ -2,25 +2,32 @@
 // Les valeurs de départ viennent du fichier de données defauts.json, jamais du code.
 // Seules les valeurs modifiées par Cyril sont enregistrées sur le téléphone.
 
+interface BaseReglage {
+  id: string;
+  groupe: string;
+  libelle: string;
+  /** Vrai si le réglage ne change que le prochain bouchon (forme, taille...). */
+  prochainBouchon?: boolean;
+}
+
 export type DefinitionReglage =
-  | {
-      id: string;
-      groupe: string;
-      libelle: string;
+  | (BaseReglage & {
       type: 'curseur';
       min: number;
       max: number;
       pas: number;
       unite?: string;
       valeur: number;
-    }
-  | {
-      id: string;
-      groupe: string;
-      libelle: string;
+    })
+  | (BaseReglage & {
       type: 'interrupteur';
       valeur: boolean;
-    };
+    })
+  | (BaseReglage & {
+      type: 'choix';
+      options: { valeur: string; libelle: string }[];
+      valeur: string;
+    });
 
 export interface GroupeReglages {
   id: string;
@@ -40,7 +47,7 @@ export interface StockageSimple {
   removeItem(cle: string): void;
 }
 
-export type ValeurReglage = number | boolean;
+export type ValeurReglage = number | boolean | string;
 
 export const CLE_STOCKAGE = 'satisfapp.reglages.v1';
 
@@ -67,6 +74,12 @@ export class Reglages {
   nombre(id: string): number {
     const v = this.lireBrut(id);
     if (typeof v !== 'number') throw new Error(`Le réglage « ${id} » n'est pas un nombre`);
+    return v;
+  }
+
+  texte(id: string): string {
+    const v = this.lireBrut(id);
+    if (typeof v !== 'string') throw new Error(`Le réglage « ${id} » n'est pas un choix`);
     return v;
   }
 
@@ -141,6 +154,9 @@ export class Reglages {
 /** Ramène une valeur dans les bornes du réglage, ou renvoie undefined si elle est inutilisable. */
 function nettoyer(def: DefinitionReglage, valeur: unknown): ValeurReglage | undefined {
   if (def.type === 'interrupteur') return typeof valeur === 'boolean' ? valeur : undefined;
+  if (def.type === 'choix') {
+    return typeof valeur === 'string' && def.options.some((o) => o.valeur === valeur) ? valeur : undefined;
+  }
   if (typeof valeur !== 'number' || !Number.isFinite(valeur)) return undefined;
   return Math.min(def.max, Math.max(def.min, valeur));
 }
