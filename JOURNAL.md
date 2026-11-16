@@ -4,9 +4,9 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
-- **Lot 2 — Spatule et paroi : construit, testé automatiquement, mis en ligne. En attente du test au doigt de Cyril.**
-  - [ ] Impossible de sortir un gros morceau sans avoir fait le tour (au doigt simulé : rien ne sort sans le tour, sur 6 bouchons).
-  - [ ] Toucher la paroi se remarque sans punir.
+- **Lot 2 — Spatule et paroi : VALIDÉ** par Cyril le 2026-11-16. **Prochain : lot 3 (tension qui se sent : vibration, sons, blanchiment), en attente du feu vert.**
+  - [x] Impossible de sortir un gros morceau sans avoir fait le tour.
+  - [x] Toucher la paroi se remarque sans punir.
 - **Lot 1 — Matière brute : VALIDÉ** par Cyril le 2026-11-16.
   - [x] Tirer doucement et tirer fort donnent deux résultats nettement différents (confirmé au doigt par Cyril, 2026-11-16).
   - [x] Mode de commande choisi : **pavé tactile**. Le mode direct décalé a été retiré du code et du panneau.
@@ -80,6 +80,9 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - La page de jeu expose `window.satisfapp` (simulation en cours) pour les vérifications automatiques.
 
 ## Historique
+
+### 2026-11-16 — Lot 2 validé
+- Cyril confirme au doigt les deux critères du lot 2.
 
 ### 2026-11-16 — Spatule confirmée au doigt
 - Cyril : la spatule marche (en partant d'une encoche claire). Restent à confirmer les deux critères du lot 2.
