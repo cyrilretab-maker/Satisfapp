@@ -100,6 +100,17 @@ export function dessiner(
   const forme = new Path2D(); // toute la cire, pour les reflets
   const nt = b.triangles.length / 3;
   const visible = new Uint8Array(nt);
+  // Chaque point de matière est aussi un petit disque : aux déchirures, la cire reste visible
+  // des deux côtés (rien ne « disparaît »), et une miette isolée se voit.
+  const rayonPoint = R * b.params.finesse * 0.5;
+  for (let i = 0; i < sim.n; i++) {
+    if (sim.sorti[i]) continue;
+    const ch = chemins[Math.round((1 - tient(i)) * 6)];
+    for (const p of [ch, forme]) {
+      p.moveTo(X(i) + rayonPoint, Y(i));
+      p.arc(X(i), Y(i), rayonPoint, 0, Math.PI * 2);
+    }
+  }
   for (let t = 0; t < nt; t++) {
     const a = b.triangles[3 * t];
     const c = b.triangles[3 * t + 1];

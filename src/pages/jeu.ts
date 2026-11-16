@@ -197,6 +197,7 @@ export function afficherJeu(
     for (const e of sim.prendreEvenements()) {
       if (e.type === 'pinceFermee') sons.tic(volumes.tics, 0.6);
       if (e.type === 'lienCasse' && sim.outil.doigt) casse = true;
+      if (e.type === 'fondAffaibli') sons.tic(volumes.tics * 0.6, 0.7);
       if (e.type === 'tourDecolle') {
         sons.tic(volumes.tics);
         const tic = reglages.nombre('vib.tic');

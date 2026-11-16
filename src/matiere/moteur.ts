@@ -51,9 +51,13 @@ export interface ParamsMatiere {
   pinceRenfort: number; // la cire pincée (pliée dans la pince) résiste N fois mieux
   pinceZonePliee: number; // taille de la zone renforcée, en multiple de la taille de la prise
   spatuleRayon: number; // portée de la pointe de la spatule
+  spatuleFond: number; // la colle du fond demande N fois plus de frottement que celle du tour
+  spatulePlancher: number; // la spatule affaiblit la colle du fond jusqu'à ce niveau (0..1), pas plus bas
+  prisePossible: number; // la pince tient franchement la cire dont la colle est descendue sous ce niveau (0..1)
   spatuleMouvement: number; // vitesse minimale pour que la spatule (ou un outil qui racle) agisse
   margeParoi: number; // distance tolérée entre la spatule et la matière avant de toucher la peau
   forceGeste: number; // force de traction par unité de distance entre le pouce et la prise
+  suiviLibre: number; // secondes : un morceau qui ne tient plus à rien suit la pince avec ce petit retard
   inertieOutil: number; // secondes de retard de l'outil quand il ne tient rien
   sousPas: number; // nombre de petits pas de calcul par image
   filsDeCire: boolean; // en se déchirant, la cire laisse des fils (sinon : cassure nette)
@@ -65,6 +69,7 @@ export type Evenement =
   | { type: 'lienCasse'; lien: number }
   | { type: 'pointDecolle'; point: number }
   | { type: 'tourDecolle'; point: number }
+  | { type: 'fondAffaibli'; point: number }
   | { type: 'paroiTouchee'; x: number; y: number }
   | { type: 'morceauSorti'; points: number; part: number; indices: number[] };
 
@@ -286,6 +291,9 @@ export class Simulation {
     const kTour = 1 / (1 + 1 / Math.max(1e-6, p.colleRaideur * RAIDEUR_TOUR) / h2);
     const prise = this.outil.ferme ? this.outil.prise : [];
     const kPrise = prise.length > 0 ? 1 / (1 + prise.length / Math.max(1e-6, p.forceGeste) / h2) : 0;
+    // Un morceau qui ne tient plus à rien suit la pince d'un bloc, presque sans traîner.
+    const libres = this.pointsDesMorceauxLibresTenus();
+    const kSuivi = libres.length > 0 ? 1 - Math.exp(-h / Math.max(0.005, p.suiviLibre)) : 0;
 
     for (let s = 0; s < S; s++) {
       for (let i = 0; i < this.n; i++) {
@@ -338,6 +346,21 @@ export class Simulation {
         const i = prise[q];
         x[i] += (this.outil.cibleX + this.outil.decalX[q] - x[i]) * kPrise;
         y[i] += (this.outil.cibleY + this.outil.decalY[q] - y[i]) * kPrise;
+      }
+      if (libres.length > 0) {
+        // L'écart entre la prise et le pouce, appliqué à tout le morceau (il garde sa forme).
+        let ex = 0;
+        let ey = 0;
+        for (let q = 0; q < prise.length; q++) {
+          ex += this.outil.cibleX + this.outil.decalX[q] - x[prise[q]];
+          ey += this.outil.cibleY + this.outil.decalY[q] - y[prise[q]];
+        }
+        ex = (ex / prise.length) * kSuivi;
+        ey = (ey / prise.length) * kSuivi;
+        for (const i of libres) {
+          x[i] += ex;
+          y[i] += ey;
+        }
       }
       for (let i = 0; i < this.n; i++) {
         if (sorti[i]) continue;
@@ -488,13 +511,44 @@ export class Simulation {
   private spatuler(deplacement: number): void {
     const o = this.outil;
     const p = this.params;
+    const plancher = Math.max(0, p.spatulePlancher);
     for (let i = 0; i < this.n; i++) {
-      if (!this.colleAuTour[i] || this.sorti[i]) continue;
-      if (Math.hypot(this.x[i] - o.x, this.y[i] - o.y) > p.spatuleRayon) continue;
-      if (!this.aCoteDUnBordLibre(i)) continue;
-      this.santeTour[i] -= deplacement / Math.max(1e-4, p.tourColle);
-      if (this.santeTour[i] <= 0) this.decollerTour(i);
+      if (this.sorti[i] || Math.hypot(this.x[i] - o.x, this.y[i] - o.y) > p.spatuleRayon) continue;
+      if (this.colleAuTour[i]) {
+        // Le tour : décollé point par point, à partir d'un bord libre.
+        if (!this.aCoteDUnBordLibre(i)) continue;
+        this.santeTour[i] -= deplacement / Math.max(1e-4, p.tourColle);
+        if (this.santeTour[i] <= 0) this.decollerTour(i);
+      } else if (this.colleAuFond[i] && this.sante[i] > plancher) {
+        // Plus profond : la spatule s'enfonce sous la cire et affaiblit la colle du fond,
+        // de proche en proche, à partir de ce qui est déjà libre ou affaibli.
+        if (!this.accessibleSousLaCire(i)) continue;
+        this.sante[i] -= deplacement / (Math.max(1e-4, p.tourColle * p.spatuleFond) * this.b.colle[i]);
+        if (this.sante[i] <= plancher) {
+          this.sante[i] = plancher;
+          this.evenements.push({ type: 'fondAffaibli', point: i });
+          if (plancher <= 0) this.decoller(i);
+        }
+      }
     }
+  }
+
+  /** Vrai si la spatule peut se glisser sous ce point : un voisin est libre, affaibli, déchiré ou parti. */
+  accessibleSousLaCire(i: number): boolean {
+    const b = this.b;
+    const plancher = Math.max(0, this.params.spatulePlancher);
+    for (let k = b.voisinsDebut[i]; k < b.voisinsDebut[i + 1]; k++) {
+      const v = b.voisins[k];
+      if (!this.lienOk[b.voisinsLien[k]] || this.sorti[v] || this.estLibre(v)) return true;
+      if (this.colleAuFond[v] && !this.colleAuTour[v] && this.sante[v] <= plancher + 1e-6) return true;
+    }
+    return false;
+  }
+
+  /** Vrai si la pince peut tenir ce point franchement : libre, ou colle du fond assez affaiblie. */
+  estPrenable(i: number): boolean {
+    if (this.estLibre(i)) return true;
+    return !this.colleAuTour[i] && this.colleAuFond[i] === 1 && this.sante[i] <= this.params.prisePossible;
   }
 
   /** Vrai si un voisin du point sur le tour est déjà décollé, ou si la cire est déchirée à côté. */
@@ -561,7 +615,7 @@ export class Simulation {
     if (proches.length === 0) return; // rien sous la pince : elle reste ouverte
 
     // La pince ne tient bien que ce qui est décollé.
-    const libres = proches.filter((i) => this.estLibre(i));
+    const libres = proches.filter((i) => this.estPrenable(i));
     const franche = libres.length > 0;
     o.prise = franche ? libres : [plusProche];
     o.faible = !franche;
@@ -618,6 +672,21 @@ export class Simulation {
     }
     o.x = sx / o.prise.length;
     o.y = sy / o.prise.length;
+  }
+
+  /** Les points des morceaux tenus par la pince qui ne tiennent plus à rien. */
+  private pointsDesMorceauxLibresTenus(): number[] {
+    const o = this.outil;
+    if (!o.ferme || o.prise.length === 0) return [];
+    const morceaux = new Set<number>();
+    for (const i of o.prise) {
+      const m = this.morceau[i];
+      if (m >= 0 && !this.morceauColle[m]) morceaux.add(m);
+    }
+    if (morceaux.size === 0) return [];
+    const points: number[] = [];
+    for (let i = 0; i < this.n; i++) if (!this.sorti[i] && morceaux.has(this.morceau[i])) points.push(i);
+    return points;
   }
 
   // ---------- Sauvegarde ----------

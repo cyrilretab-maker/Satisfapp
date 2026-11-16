@@ -100,6 +100,12 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 
 ## Historique
 
+### 2026-11-16 — Retours de Cyril sur les lots 3 à 5
+- « Ça s'effrite, trop de matière disparaît » : à chaque déchirure, les triangles abîmés n'étaient plus dessinés (une bande de cire disparaissait à l'écran). Désormais chaque point de matière est aussi dessiné comme un petit disque : la cire reste visible des deux côtés d'une déchirure, et les miettes se voient. Zones faibles moins fragiles (30 → 45 %), cire plus régulière (15 → 10 %).
+- « C'est trop long pour retirer la partie une fois décollée » : un gros morceau libre tiré par un ressort de pince faible mettait jusqu'à 8 s à suivre un pouce immobile. **Un morceau qui ne tient plus à rien suit maintenant la pince d'un bloc** (retard réglable, 60 ms).
+- « La spatule doit s'enfoncer plus profond, décoller plus que le bord ; de vrais niveaux d'adhérence » : **changement de règle demandé par Cyril** (le cahier des charges disait que la spatule ne décolle pas le fond). La spatule s'enfonce sous la cire de proche en proche depuis ce qui est libre ou affaibli, et **affaiblit la colle du fond jusqu'à 20 %** (réglable ; 0 = elle décolle tout). La pince tient franchement la cire dont la colle est sous 50 %. Le fond a donc des niveaux : pleine colle → affaiblie à la spatule → lâchée en tirant à la pince. Un petit tic plus doux quand un point atteint le plancher.
+- 63 tests.
+
 ### 2026-11-16 — Lots 3, 4 et 5 construits d'une traite
 - Cyril demande d'enchaîner les lots 3, 4 et 5 sans s'arrêter entre eux.
 - Lot 3 : pilote de tension, sons fabriqués, blanchiment, tics de spatule. Lot 4 : habillage complet. Lot 5 : sortie animée, bocal permanent, fin de partie, sauvegarde et reprise.

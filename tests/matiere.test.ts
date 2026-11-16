@@ -187,7 +187,7 @@ describe('Règles de la colle du fond', () => {
   it('changer de direction fait lâcher la colle plus vite', () => {
     const mesurer = (zigzag: number) => {
       // Colle plus lente que d'habitude, pour bien mesurer la différence.
-      const sim = nouvelleSimulation(4, { 'colle.duree': 0.6 });
+      const sim = nouvelleSimulation(4, { 'colle.duree': 0.6, 'spatule.plancher': 90 }); // spatule sans effet sur le fond, pour isoler la règle
       faireLeTour(sim);
       saisir(sim, pointLibreDuBord(sim, 1));
       tirer(sim, { angle: 1, vitesse: 0.3, duree: 2, tensionMax: 0.6, zigzag });
@@ -318,5 +318,46 @@ describe('Cassure nette et spatule imprécise', () => {
       frotter(sim, Math.cos(ang) * r, Math.sin(ang) * r, 4);
       expect(sim.tourRestant()).toBeLessThan(avant);
     }
+  });
+});
+
+describe('La spatule sous la cire (niveaux d\x27adhérence)', () => {
+  it('elle affaiblit la colle du fond de proche en proche, sans la décoller complètement', () => {
+    const sim = nouvelleSimulation(1);
+    const a = angleDEntree(sim);
+    const i = pointDuBord(sim, a);
+    // On frotte en s'enfonçant vers le centre, à partir du point d'entrée.
+    for (const k of [0, 0.08, 0.16]) frotter(sim, sim.b.x0[i] * (1 - k), sim.b.y0[i] * (1 - k), 3);
+    const plancher = sim.params.spatulePlancher;
+    let affaiblis = 0;
+    for (let j = 0; j < sim.n; j++) {
+      if (!sim.colleAuFond[j]) continue;
+      expect(sim.sante[j]).toBeGreaterThanOrEqual(plancher - 1e-9);
+      if (sim.sante[j] < 0.99) affaiblis++;
+    }
+    expect(affaiblis).toBeGreaterThan(3);
+    expect(nbDecolles(sim)).toBe(sim.n - compter(sim.colleAuFond)); // rien de décollé en plus du tour
+    expect(sim.prendreEvenements().some((e) => e.type === 'fondAffaibli')).toBe(true);
+  });
+
+  it('au milieu, loin de tout bord libre, elle ne s\x27enfonce pas', () => {
+    const sim = nouvelleSimulation(1);
+    let centre = 0;
+    for (let j = 0; j < sim.n; j++) if (Math.hypot(sim.x[j], sim.y[j]) < Math.hypot(sim.x[centre], sim.y[centre])) centre = j;
+    frotter(sim, sim.x[centre], sim.y[centre], 4);
+    expect(sim.sante.every((v, j) => !sim.colleAuFond[j] || v === 1)).toBe(true);
+  });
+
+  it('la pince tient franchement la cire affaiblie par la spatule', () => {
+    const sim = nouvelleSimulation(1);
+    const a = angleDEntree(sim);
+    const i = pointDuBord(sim, a);
+    for (const k of [0, 0.08, 0.16]) frotter(sim, sim.b.x0[i] * (1 - k), sim.b.y0[i] * (1 - k), 3);
+    let affaibli = -1;
+    for (let j = 0; j < sim.n; j++) if (sim.colleAuFond[j] && sim.sante[j] <= sim.params.prisePossible) affaibli = j;
+    expect(affaibli).toBeGreaterThanOrEqual(0);
+    sim.choisirOutil('pince');
+    expect(saisir(sim, affaibli)).toBe(true);
+    expect(sim.outil.faible).toBe(false);
   });
 });
