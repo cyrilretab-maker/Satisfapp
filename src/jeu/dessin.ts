@@ -23,6 +23,7 @@ export interface OptionsDessin {
   temps: number; // secondes (horloge de la page)
   dureeRougeur: number; // secondes
   sursaut: number; // amplitude en pixels (0 = coupé)
+  blanchiment: number; // part de l'étirement maximal à partir de laquelle la cire blanchit
 }
 
 export function dessiner(
@@ -105,6 +106,27 @@ export function dessiner(
     ctx.fill(ch);
     ctx.stroke(ch); // bouche les fentes fines entre triangles voisins
   });
+
+  // Blanchiment : la cire pâlit là où elle est près de céder.
+  const etirement = new Float32Array(b.lienA.length);
+  for (let l = 0; l < b.lienA.length; l++) if (sim.lienOk[l]) etirement[l] = sim.allongement(l) / sim.limite(l);
+  for (let t = 0; t < nt; t++) {
+    if (!sim.triangleIntact(t)) continue;
+    const m = Math.max(etirement[b.triangleLiens[3 * t]], etirement[b.triangleLiens[3 * t + 1]], etirement[b.triangleLiens[3 * t + 2]]);
+    const k = (m - o.blanchiment) / Math.max(1e-6, 1 - o.blanchiment);
+    if (k <= 0) continue;
+    const a = b.triangles[3 * t];
+    const c = b.triangles[3 * t + 1];
+    const e = b.triangles[3 * t + 2];
+    if (sim.sorti[a] || sim.sorti[c] || sim.sorti[e]) continue;
+    ctx.fillStyle = `rgba(245, 245, 240, ${Math.min(0.85, k)})`;
+    ctx.beginPath();
+    ctx.moveTo(X(a), Y(a));
+    ctx.lineTo(X(c), Y(c));
+    ctx.lineTo(X(e), Y(e));
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // Fils de matière qui ne forment plus de surface (liens seuls)
   const fils = new Path2D();
