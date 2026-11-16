@@ -1,23 +1,31 @@
-// Affichage en formes grises (lots 1 à 3). Il ne fait que lire l'état du moteur et de la peau.
+// Affichage habillé (lot 4) : vue ronde d'endoscope, cire dorée un peu translucide avec reflets,
+// peau du conduit qui s'éclaircit une fois dégagée. Il ne fait que lire l'état du moteur et de la peau.
 
 import { RAYON_PAROI, type Simulation } from '../matiere/moteur';
 import type { Disposition } from './ecran';
 import type { Peau } from './peau';
 
 const COULEURS = {
-  page: '#1e1e1e',
-  fond: '#3b3b3b', // le fond du conduit, derrière le bouchon
-  paroi: '#4a4a4a', // la paroi du conduit, tout autour
-  bordVue: '#111',
-  // Matière, de « collée partout » (foncé) à « décollée » (clair), en 7 nuances
-  matiere: ['#8a8a8a', '#909090', '#979797', '#9d9d9d', '#a3a3a3', '#aaaaaa', '#b0b0b0'],
-  fil: '#a8a8a8',
-  outil: '#e8e8e8',
-  outilFerme: '#ffffff',
-  pave: '#2a2a2a',
-  paveBord: '#3a3a3a',
-  paveTexte: '#555',
+  page: '#141010',
+  pave: '#221c1b',
+  paveBord: '#352c2a',
+  paveTexte: '#5a4d4a',
+  bordVue: '#050303',
+  // La peau : le fond du conduit est sombre au milieu, la paroi plus claire tout autour.
+  fondProfond: '#1c100d',
+  fondMilieu: '#6e4338',
+  paroi: '#c58c78',
+  peauPropre: '224, 172, 152', // la peau dégagée « respire » (rgb)
+  rougeur: '205, 45, 55', // rgb
+  // La cire, de « collée partout » (ambre foncé) à « décollée » (miel clair), en 7 nuances
+  cire: ['#7c4f17', '#87591b', '#93641f', '#a07024', '#ae7d2b', '#bd8c33', '#cc9b3d'],
+  cireBord: 'rgba(80, 45, 10, 0.75)',
+  blanchie: '250, 238, 205', // rgb : la cire blanchit là où elle va céder
+  outil: '#d9dde0',
+  outilOmbre: 'rgba(0, 0, 0, 0.35)',
 };
+
+const DUREE_ECLAIRCISSEMENT = 2.5; // secondes pour que la peau dégagée s'éclaircisse
 
 export interface OptionsDessin {
   temps: number; // secondes (horloge de la page)
@@ -39,7 +47,165 @@ export function dessiner(
   const cy = d.cy + sy;
   ctx.fillStyle = COULEURS.page;
   ctx.fillRect(0, 0, d.largeur, d.hauteur);
+  dessinerPave(ctx, d);
 
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.clip();
+
+  // 1. La peau du conduit : sombre au fond, claire sur la paroi.
+  const peauDegrade = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+  peauDegrade.addColorStop(0, COULEURS.fondProfond);
+  peauDegrade.addColorStop(0.55, COULEURS.fondMilieu);
+  peauDegrade.addColorStop(RAYON_PAROI, COULEURS.paroi);
+  peauDegrade.addColorStop(1, COULEURS.paroi);
+  ctx.fillStyle = peauDegrade;
+  ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+
+  const X = (i: number) => cx + sim.x[i] * R;
+  const Y = (i: number) => cy + sim.y[i] * R;
+  const b = sim.b;
+
+  // 2. La peau dégagée s'éclaircit peu à peu, là où le bouchon était.
+  const tailleTache = R * sim.b.lienLongueur[0] * 1.6;
+  for (let i = 0; i < sim.n; i++) {
+    if (!sim.sorti[i]) continue;
+    const k = Math.min(1, (sim.temps - sim.sortiA[i]) / DUREE_ECLAIRCISSEMENT);
+    const gx = cx + b.x0[i] * R;
+    const gy = cy + b.y0[i] * R;
+    const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, tailleTache);
+    g.addColorStop(0, `rgba(${COULEURS.peauPropre}, ${0.28 * k})`);
+    g.addColorStop(1, `rgba(${COULEURS.peauPropre}, 0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(gx - tailleTache, gy - tailleTache, 2 * tailleTache, 2 * tailleTache);
+  }
+
+  // 3. Les rougeurs laissées par les contacts avec la peau.
+  for (const r of peau.rougeurs) {
+    const force = peau.intensite(r, o.temps, o.dureeRougeur);
+    if (force <= 0) continue;
+    const gx = cx + r.x * R;
+    const gy = cy + r.y * R;
+    const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, R * 0.12);
+    g.addColorStop(0, `rgba(${COULEURS.rougeur}, ${0.5 * force})`);
+    g.addColorStop(1, `rgba(${COULEURS.rougeur}, 0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(gx - R * 0.12, gy - R * 0.12, R * 0.24, R * 0.24);
+  }
+
+  // 4. La cire : triangles regroupés par teinte selon ce qui leur reste de colle.
+  const tient = (i: number) => (sim.colleAuTour[i] ? sim.santeTour[i] : sim.colleAuFond[i] ? sim.sante[i] : 0);
+  const chemins = COULEURS.cire.map(() => new Path2D());
+  const forme = new Path2D(); // toute la cire, pour les reflets
+  const nt = b.triangles.length / 3;
+  const visible = new Uint8Array(nt);
+  for (let t = 0; t < nt; t++) {
+    const a = b.triangles[3 * t];
+    const c = b.triangles[3 * t + 1];
+    const e = b.triangles[3 * t + 2];
+    if (sim.sorti[a] || sim.sorti[c] || sim.sorti[e] || !sim.triangleIntact(t)) continue;
+    visible[t] = 1;
+    const ch = chemins[Math.round(((3 - (tient(a) + tient(c) + tient(e))) / 3) * 6)];
+    for (const p of [ch, forme]) {
+      p.moveTo(X(a), Y(a));
+      p.lineTo(X(c), Y(c));
+      p.lineTo(X(e), Y(e));
+      p.closePath();
+    }
+  }
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.94; // un peu translucide : la peau transparaît à peine
+  chemins.forEach((ch, k) => {
+    ctx.fillStyle = COULEURS.cire[k];
+    ctx.strokeStyle = COULEURS.cire[k];
+    ctx.fill(ch);
+    ctx.stroke(ch); // bouche les fentes fines entre triangles voisins
+  });
+  ctx.globalAlpha = 1;
+
+  // 5. Le bord de la cire, plus sombre (épaisseur), et les miettes isolées.
+  const bords = new Path2D();
+  for (let l = 0; l < b.lienA.length; l++) {
+    if (!sim.lienOk[l]) continue;
+    const t1 = b.lienTriangles[2 * l];
+    const t2 = b.lienTriangles[2 * l + 1];
+    const n = (t1 >= 0 && visible[t1] ? 1 : 0) + (t2 >= 0 && visible[t2] ? 1 : 0);
+    if (n !== 1) continue;
+    bords.moveTo(X(b.lienA[l]), Y(b.lienA[l]));
+    bords.lineTo(X(b.lienB[l]), Y(b.lienB[l]));
+  }
+  ctx.strokeStyle = COULEURS.cireBord;
+  ctx.lineWidth = Math.max(1.2, R * 0.008);
+  ctx.lineCap = 'round';
+  ctx.stroke(bords);
+
+  // 6. Blanchiment : la cire pâlit là où elle est près de céder.
+  const etirement = new Float32Array(b.lienA.length);
+  for (let l = 0; l < b.lienA.length; l++) if (sim.lienOk[l]) etirement[l] = sim.allongement(l) / sim.limite(l);
+  for (let t = 0; t < nt; t++) {
+    if (!visible[t]) continue;
+    const tl = b.triangleLiens;
+    const m = Math.max(etirement[tl[3 * t]], etirement[tl[3 * t + 1]], etirement[tl[3 * t + 2]]);
+    const k = (m - o.blanchiment) / Math.max(1e-6, 1 - o.blanchiment);
+    if (k <= 0) continue;
+    const a = b.triangles[3 * t];
+    const c = b.triangles[3 * t + 1];
+    const e = b.triangles[3 * t + 2];
+    ctx.fillStyle = `rgba(${COULEURS.blanchie}, ${Math.min(0.85, k)})`;
+    ctx.beginPath();
+    ctx.moveTo(X(a), Y(a));
+    ctx.lineTo(X(c), Y(c));
+    ctx.lineTo(X(e), Y(e));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 7. Reflets : la lumière de la caméra fait briller la cire au milieu, et quelques points humides.
+  ctx.save();
+  ctx.clip(forme);
+  const lumiere = ctx.createRadialGradient(cx - R * 0.1, cy - R * 0.15, 0, cx, cy, R * 0.85);
+  lumiere.addColorStop(0, 'rgba(255, 240, 200, 0.32)');
+  lumiere.addColorStop(0.5, 'rgba(255, 230, 180, 0.08)');
+  lumiere.addColorStop(1, 'rgba(255, 230, 180, 0)');
+  ctx.fillStyle = lumiere;
+  ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+  for (let i = 0; i < sim.n; i++) {
+    // Quelques points « humides », éparpillés (toujours les mêmes pour un même bouchon).
+    const h = (i * 2654435761) >>> 0;
+    if (h % 41 !== 0 || sim.sorti[i]) continue;
+    const taille = 0.6 + ((h >>> 8) % 100) / 100;
+    ctx.fillStyle = `rgba(255, 252, 235, ${0.25 + ((h >>> 16) % 30) / 100})`;
+    ctx.beginPath();
+    ctx.ellipse(X(i), Y(i), R * 0.016 * taille, R * 0.007 * taille, ((h >>> 4) % 314) / 100, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 8. L'outil, éclairé par la caméra.
+  const ox = cx + sim.outil.x * R;
+  const oy = cy + sim.outil.y * R;
+  if (sim.outil.type === 'spatule') dessinerSpatule(ctx, ox, oy, R);
+  else dessinerPince(ctx, ox, oy, sim.outil.ferme, R);
+
+  // 9. Le bord sombre de l'endoscope (vignettage).
+  const vignette = ctx.createRadialGradient(cx, cy, R * 0.62, cx, cy, R);
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(0.75, 'rgba(0, 0, 0, 0.35)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = COULEURS.bordVue;
+  ctx.lineWidth = 5;
+  ctx.stroke();
+}
+
+function dessinerPave(ctx: CanvasRenderingContext2D, d: Disposition): void {
   const p = d.pave;
   ctx.fillStyle = COULEURS.pave;
   ctx.strokeStyle = COULEURS.paveBord;
@@ -52,116 +218,32 @@ export function dessiner(
   ctx.font = '14px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('zone du pouce', p.x + p.l / 2, p.y + p.h / 2);
-
-  // La vue ronde : la paroi tout autour, le fond au milieu.
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.fillStyle = COULEURS.paroi;
-  ctx.fill();
-  ctx.clip();
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * RAYON_PAROI, 0, Math.PI * 2);
-  ctx.fillStyle = COULEURS.fond;
-  ctx.fill();
-
-  // Les rougeurs laissées par les contacts avec la peau.
-  for (const r of peau.rougeurs) {
-    const force = peau.intensite(r, o.temps, o.dureeRougeur);
-    if (force <= 0) continue;
-    const gx = cx + r.x * R;
-    const gy = cy + r.y * R;
-    const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, R * 0.12);
-    g.addColorStop(0, `rgba(190, 70, 70, ${0.55 * force})`);
-    g.addColorStop(1, 'rgba(190, 70, 70, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(gx - R * 0.12, gy - R * 0.12, R * 0.24, R * 0.24);
-  }
-
-  const X = (i: number) => cx + sim.x[i] * R;
-  const Y = (i: number) => cy + sim.y[i] * R;
-  const b = sim.b;
-  // Ce qui reste de colle à chaque point (1 = intacte, 0 = libre) : la matière pâlit à mesure qu'elle s'use.
-  const tient = (i: number) => (sim.colleAuTour[i] ? sim.santeTour[i] : sim.colleAuFond[i] ? sim.sante[i] : 0);
-
-  // Triangles de matière, regroupés par teinte (selon combien de leurs coins tiennent encore).
-  const chemins = COULEURS.matiere.map(() => new Path2D());
-  const nt = b.triangles.length / 3;
-  for (let t = 0; t < nt; t++) {
-    const a = b.triangles[3 * t];
-    const c = b.triangles[3 * t + 1];
-    const e = b.triangles[3 * t + 2];
-    if (sim.sorti[a] || sim.sorti[c] || sim.sorti[e] || !sim.triangleIntact(t)) continue;
-    const ch = chemins[Math.round(((3 - (tient(a) + tient(c) + tient(e))) / 3) * 6)];
-    ch.moveTo(X(a), Y(a));
-    ch.lineTo(X(c), Y(c));
-    ch.lineTo(X(e), Y(e));
-    ch.closePath();
-  }
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = 1;
-  chemins.forEach((ch, k) => {
-    ctx.fillStyle = COULEURS.matiere[k];
-    ctx.strokeStyle = COULEURS.matiere[k];
-    ctx.fill(ch);
-    ctx.stroke(ch); // bouche les fentes fines entre triangles voisins
-  });
-
-  // Blanchiment : la cire pâlit là où elle est près de céder.
-  const etirement = new Float32Array(b.lienA.length);
-  for (let l = 0; l < b.lienA.length; l++) if (sim.lienOk[l]) etirement[l] = sim.allongement(l) / sim.limite(l);
-  for (let t = 0; t < nt; t++) {
-    if (!sim.triangleIntact(t)) continue;
-    const m = Math.max(etirement[b.triangleLiens[3 * t]], etirement[b.triangleLiens[3 * t + 1]], etirement[b.triangleLiens[3 * t + 2]]);
-    const k = (m - o.blanchiment) / Math.max(1e-6, 1 - o.blanchiment);
-    if (k <= 0) continue;
-    const a = b.triangles[3 * t];
-    const c = b.triangles[3 * t + 1];
-    const e = b.triangles[3 * t + 2];
-    if (sim.sorti[a] || sim.sorti[c] || sim.sorti[e]) continue;
-    ctx.fillStyle = `rgba(245, 245, 240, ${Math.min(0.85, k)})`;
-    ctx.beginPath();
-    ctx.moveTo(X(a), Y(a));
-    ctx.lineTo(X(c), Y(c));
-    ctx.lineTo(X(e), Y(e));
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Fils de matière qui ne forment plus de surface (liens seuls)
-  const fils = new Path2D();
-  for (let l = 0; l < b.lienA.length; l++) {
-    if (!sim.lienOk[l]) continue;
-    const t1 = b.lienTriangles[2 * l];
-    const t2 = b.lienTriangles[2 * l + 1];
-    if ((t1 >= 0 && sim.triangleIntact(t1)) || (t2 >= 0 && sim.triangleIntact(t2))) continue;
-    const a = b.lienA[l];
-    const c = b.lienB[l];
-    if (sim.sorti[a] || sim.sorti[c]) continue;
-    fils.moveTo(X(a), Y(a));
-    fils.lineTo(X(c), Y(c));
-  }
-  ctx.strokeStyle = COULEURS.fil;
-  ctx.lineWidth = Math.max(1.5, R * 0.012);
-  ctx.lineCap = 'round';
-  ctx.stroke(fils);
-
-  // L'outil
-  const ox = cx + sim.outil.x * R;
-  const oy = cy + sim.outil.y * R;
-  if (sim.outil.type === 'spatule') dessinerSpatule(ctx, ox, oy, R);
-  else dessinerPince(ctx, ox, oy, sim.outil.ferme, R);
-  ctx.restore();
-
-  // Bord sombre de la vue
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.strokeStyle = COULEURS.bordVue;
-  ctx.lineWidth = 4;
-  ctx.stroke();
 }
 
 const MANCHE: [number, number] = [0.45, 0.89]; // direction du manche (vers le bas, un peu à droite)
+
+/** Trace une tige métallique : ombre portée, corps, reflet. */
+function tige(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, epaisseur: number): void {
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = COULEURS.outilOmbre;
+  ctx.lineWidth = epaisseur + 2;
+  ctx.beginPath();
+  ctx.moveTo(x1 + 2, y1 + 3);
+  ctx.lineTo(x2 + 2, y2 + 3);
+  ctx.stroke();
+  ctx.strokeStyle = COULEURS.outil;
+  ctx.lineWidth = epaisseur;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.lineWidth = Math.max(1, epaisseur * 0.3);
+  ctx.beginPath();
+  ctx.moveTo(x1 - 1, y1 - 1);
+  ctx.lineTo(x2 - 1, y2 - 1);
+  ctx.stroke();
+}
 
 /** Une pince vue de face : deux mors qui viennent d'en bas à droite. Ouverte ou fermée. */
 function dessinerPince(ctx: CanvasRenderingContext2D, x: number, y: number, ferme: boolean, R: number): void {
@@ -169,32 +251,15 @@ function dessinerPince(ctx: CanvasRenderingContext2D, x: number, y: number, ferm
   const [dx, dy] = MANCHE;
   const [nx, ny] = [-dy, dx];
   const ouverture = ferme ? R * 0.006 : R * 0.035;
-  ctx.strokeStyle = ferme ? COULEURS.outilFerme : COULEURS.outil;
-  ctx.lineWidth = Math.max(2, R * 0.014);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  for (const s of [-1, 1]) {
-    ctx.moveTo(x + nx * ouverture * s, y + ny * ouverture * s);
-    ctx.lineTo(x + dx * longueur, y + dy * longueur);
-  }
-  ctx.lineTo(x + dx * R * 2, y + dy * R * 2);
-  ctx.stroke();
+  const e = Math.max(2, R * 0.016);
+  for (const s of [-1, 1]) tige(ctx, x + nx * ouverture * s, y + ny * ouverture * s, x + dx * longueur, y + dy * longueur, e);
+  tige(ctx, x + dx * longueur, y + dy * longueur, x + dx * R * 2, y + dy * R * 2, e * 1.3);
 }
 
 /** Une spatule : une petite lame plate et arrondie au bout d'une tige fine. */
 function dessinerSpatule(ctx: CanvasRenderingContext2D, x: number, y: number, R: number): void {
   const [dx, dy] = MANCHE;
   const lame = R * 0.09;
-  ctx.strokeStyle = COULEURS.outil;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(5, R * 0.045);
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + dx * lame, y + dy * lame);
-  ctx.stroke();
-  ctx.lineWidth = Math.max(2, R * 0.012);
-  ctx.beginPath();
-  ctx.moveTo(x + dx * lame, y + dy * lame);
-  ctx.lineTo(x + dx * R * 2, y + dy * R * 2);
-  ctx.stroke();
+  tige(ctx, x + dx * lame, y + dy * lame, x + dx * R * 2, y + dy * R * 2, Math.max(2, R * 0.014));
+  tige(ctx, x, y, x + dx * lame, y + dy * lame, Math.max(5, R * 0.045));
 }

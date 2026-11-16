@@ -87,6 +87,8 @@ export class Simulation {
   readonly lienOk: Uint8Array;
   /** 1 si le point a été sorti de la vue. */
   readonly sorti: Uint8Array;
+  /** Instant (secondes) où le point est sorti (pour que la peau découverte s'éclaircisse). */
+  readonly sortiA: Float64Array;
   /** Numéro de morceau de chaque point (morceau = points reliés entre eux). */
   readonly morceau: Int32Array;
   /** 1 si le morceau tient encore quelque part (fond ou tour). */
@@ -137,6 +139,7 @@ export class Simulation {
     this.colleAuTour = Uint8Array.from(bouchon.bord, (b, i) => (b && !bouchon.entree[i] ? 1 : 0));
     this.santeTour = Float64Array.from(this.colleAuTour);
     this.sorti = new Uint8Array(n);
+    this.sortiA = new Float64Array(n);
     this.morceau = new Int32Array(n);
     this.lienOk = new Uint8Array(bouchon.lienA.length).fill(1);
     this.lienPinceFaible = new Uint8Array(bouchon.lienA.length);
@@ -670,6 +673,7 @@ export class Simulation {
       for (let j = 0; j < this.n; j++) {
         if (this.morceau[j] !== m) continue;
         this.sorti[j] = 1;
+        this.sortiA[j] = this.temps;
         k++;
       }
       const part = k / this.n;
