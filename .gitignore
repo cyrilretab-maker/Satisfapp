@@ -1,0 +1,7 @@
+# Dépendances et fichiers construits (recréés automatiquement)
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
