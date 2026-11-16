@@ -4,7 +4,9 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
-- **Lot en cours :** 1 — Matière brute. Construit, testé automatiquement, mis en ligne. **En attente :** test au doigt de Cyril et choix du mode de commande.
+- **Lot en cours :** 1 — Matière brute. Construit, testé automatiquement, mis en ligne.
+  - [x] Tirer doucement et tirer fort donnent deux résultats nettement différents (confirmé au doigt par Cyril, 2026-11-16).
+  - [ ] Cyril choisit son mode de commande (pavé tactile ou direct décalé). **En attente.**
 - **Lot 0 :** validé (rythmes sentis et distingués ; Cyril a donné le feu vert pour le lot 1). Ouverture en mode avion jamais confirmée explicitement.
 - **Adresse de test :** https://cyrilretab-maker.github.io/Satisfapp/
 
