@@ -102,6 +102,15 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 
 ## Historique
 
+### 2026-11-16 — V2 : la profondeur du bouchon
+- Cyril : « c'est super », puis « rajouter de la profondeur comme un vrai bouchon de cérumen ».
+- **Masse bombée** : un second champ, très flou, donne au bouchon une épaisseur (haut au milieu, qui s'arrondit vers les bords) ; la lumière de l'endoscope l'éclaire comme un volume.
+- **Tranche visible** : au pourtour et dans les déchirures, on voit l'épaisseur de la cire, plus brune.
+- **Ombre au pied** du bouchon sur la peau.
+- **Cire décollée qui se soulève** (le « petit sac », et plus encore ce que tient la pince) : un peu plus claire, et elle projette son ombre sur la peau et sur la cire restée collée.
+- Réglages ajoutés (groupe Image) : épaisseur, largeur de l'arrondi, ombre au pied, hauteur de la cire décollée. Transparence de la cire fine ramenée de 40 à 25 % (elle contredisait l'épaisseur).
+- Dessin ≈ 0,25 ms par image sur ordinateur. 69 tests.
+
 ### 2026-11-16 — V2 : dessin réaliste par la puce graphique (WebGL)
 - Demande de Cyril : « passer de ces petits losanges à une texture plus réaliste comme une oreille », et plus de fluidité. Il a accepté le passage à WebGL.
 - **Cire** : chaque point et chaque triangle sont peints dans une image cachée, floutée, puis découpée : une masse lisse et ronde, sans facettes. Relief (bords bombés) tiré de cette masse, bosses et grain qui bougent avec la cire, reflets mouillés de la lumière de l'endoscope, cire plus claire et un peu transparente là où elle est fine, ombre sur la peau. Les couleurs gardent le sens de la colle (ambre foncé = collée, miel = décollée) et le blanchiment avant la casse.

@@ -13,7 +13,8 @@ import type { Simulation } from '../matiere/moteur';
 import { fabriquerBruit, TAILLE_BRUIT } from './bruit';
 import type { Peau } from './peau';
 
-const ETENDUE = 1.05; // le champ couvre la vue de -ETENDUE à +ETENDUE (unités de vue)
+const ETENDUE = 1.05;
+const FLOTTANTS_PAR_POINT = 7; // x, y, décollé, blanchi, u, v (place au repos), hauteur // le champ couvre la vue de -ETENDUE à +ETENDUE (unités de vue)
 const DUREE_ECLAIRCISSEMENT = 2.5;
 const FOND_PAGE = [0x14 / 255, 0x10 / 255, 0x10 / 255];
 
@@ -35,6 +36,10 @@ export interface OptionsRendu {
   peauPlis: number;
   ombre: number;
   qualite: number; // 0..1 : finesse du champ de cire par rapport à l'écran
+  epaisseur: number; // bombé du bouchon
+  arrondi: number; // largeur de l'arrondi des bords (unités de vue)
+  contact: number; // ombre là où la cire touche la peau
+  leve: number; // hauteur de la cire décollée (unités de vue) : longueur de son ombre portée
 }
 
 // ---------- Les programmes de la puce graphique ----------
@@ -42,10 +47,13 @@ export interface OptionsRendu {
 const VS_MATIERE = `#version 300 es
 in vec2 aPos;
 in vec4 aDon;
+in float aLeve;
 uniform float uTaille;
 out vec4 vDon;
+out float vLeve;
 void main() {
   vDon = aDon;
+  vLeve = aLeve;
   gl_Position = vec4(aPos / ${ETENDUE.toFixed(3)}, 0.0, 1.0);
   gl_PointSize = uTaille;
 }`;
@@ -53,6 +61,7 @@ void main() {
 const FS_MATIERE = `#version 300 es
 precision highp float;
 in vec4 vDon;
+in float vLeve;
 uniform bool uPoint;
 uniform float uRayonUv; // rayon d'un disque, en unités de « place au repos »
 layout(location = 0) out vec4 o0;
@@ -66,7 +75,7 @@ void main() {
     uv += vec2(d.x, -d.y) * uRayonUv;
   }
   o0 = vec4(1.0, vDon.x, vDon.y, 1.0);
-  o1 = vec4(uv, 0.0, 1.0);
+  o1 = vec4(uv, vLeve, 1.0); // b = hauteur de la cire au-dessus de la peau (0 = posée, 1 = soulevée)
 }`;
 
 const VS_PLEIN = `#version 300 es
@@ -161,7 +170,33 @@ uniform float uPeauGrain;
 uniform float uPeauPlis;
 uniform float uOmbre;
 uniform float uRayonPx;
+uniform sampler2D uDome;
+uniform vec2 uTexelDome;
+uniform float uEpaisseur;
+uniform float uContact;
+uniform float uLeve;
 out vec4 sortie;
+
+// La lumière vient d'en haut à gauche : les ombres partent vers le bas à droite.
+const vec2 VERS_OMBRE = vec2(0.59, 0.81);
+
+float hauteurEn(vec2 p) {
+  vec4 c = texture(uC1, p);
+  return c.a > 0.02 ? c.b / c.a : 0.0;
+}
+
+/** Ombre portée sur ce point par la cire soulevée autour (0 = aucune, 1 = pleine). */
+float ombrePortee(vec2 q, float hauteurIci) {
+  float s = 0.0;
+  for (int k = 1; k <= 5; k++) {
+    float o = float(k) / 5.0 * uLeve;
+    vec2 p = q - VERS_OMBRE * o;
+    float present = smoothstep(0.35, 0.6, texture(uC0, p).r);
+    float dessus = (hauteurEn(p) - hauteurIci) * uLeve;
+    s = max(s, present * smoothstep(o * 0.5, o, dessus));
+  }
+  return s;
+}
 
 // Les bosses de la cire, lues dans sa place « au repos » (elles bougent avec elle).
 float bosses(vec2 uv) {
@@ -201,6 +236,10 @@ void main() {
   cp = mix(cp, vec3(0.80, 0.18, 0.22), clamp(mk.r, 0.0, 1.0) * 0.55);
   float ombre = texture(uC0, q + vec2(0.010, 0.016)).r;
   cp *= 1.0 - uOmbre * 0.55 * clamp(ombre, 0.0, 1.0);
+  // Au pied du bouchon, la peau est dans l'ombre de sa masse ; la cire soulevée projette son ombre.
+  float dome = texture(uDome, q).r;
+  cp *= 1.0 - uContact * 0.45 * smoothstep(0.05, 0.6, dome);
+  if (uLeve > 0.0) cp *= 1.0 - 0.6 * ombrePortee(q, 0.0);
   float murs = smoothstep(0.3, 0.9, r);
   vec3 couleur = cp * (0.78 + 0.3 * max(dot(Np, L), 0.0))
     + vec3(1.0, 0.92, 0.88) * pow(max(dot(Np, H), 0.0), 45.0) * uBrillance * 0.45 * murs;
@@ -226,7 +265,13 @@ void main() {
       texture(uC0, q + vec2(uTexel.x, 0.0)).r - texture(uC0, q - vec2(uTexel.x, 0.0)).r,
       texture(uC0, q + vec2(0.0, uTexel.y)).r - texture(uC0, q - vec2(0.0, uTexel.y)).r
     );
-    vec3 N = normalize(vec3(-g * 3.0 * uRelief - pb * 40.0 * uGrain, 1.0));
+    // Le volume : la pente de la masse bombée (en unités de vue), puis les bords et les bosses.
+    vec2 gd = vec2(
+      texture(uDome, q + vec2(uTexelDome.x, 0.0)).r - texture(uDome, q - vec2(uTexelDome.x, 0.0)).r,
+      texture(uDome, q + vec2(0.0, uTexelDome.y)).r - texture(uDome, q - vec2(0.0, uTexelDome.y)).r
+    ) / (4.0 * ${ETENDUE.toFixed(3)} * uTexelDome.x);
+    float hauteurIci = hauteurEn(q);
+    vec3 N = normalize(vec3(-gd * uEpaisseur * 0.22 - g * 3.0 * uRelief - pb * 40.0 * uGrain, 1.0));
     float epais = smoothstep(uSeuil, min(1.0, uSeuil + 0.4), cov);
     vec3 ambre = vec3(0.58, 0.34, 0.08);
     vec3 miel = vec3(0.90, 0.66, 0.28);
@@ -235,6 +280,15 @@ void main() {
     cc = mix(cc, vec3(0.98, 0.93, 0.80), blanc * 0.85);
     // Là où la cire est fine, la lumière la traverse : plus chaude, plus claire, la peau transparaît.
     cc = mix(cc * 1.25 + vec3(0.06, 0.03, 0.0), cc, epais);
+    // L'épaisseur : là où la masse est haute mais qu'un bord tombe (pourtour, déchirure),
+    // on voit la tranche de la cire, plus sombre et plus brune.
+    float tranche = (1.0 - smoothstep(uSeuil, uSeuil + 0.22, cov)) * smoothstep(0.25, 0.7, dome) * min(1.0, uEpaisseur);
+    cc = mix(cc, vec3(0.34, 0.18, 0.05), tranche * 0.5);
+    // Le bas de la masse, loin de la lumière, reste plus sombre.
+    cc *= mix(0.82, 1.0, mix(1.0, smoothstep(0.15, 0.75, dome), min(1.0, uEpaisseur)));
+    // La cire soulevée est plus près de la caméra : un peu plus claire ; celle d'en dessous est dans son ombre.
+    cc *= 1.0 + hauteurIci * 0.12;
+    if (uLeve > 0.0) cc *= 1.0 - 0.45 * ombrePortee(q, hauteurIci);
     float diffus = 0.5 + 0.65 * max(dot(N, L), 0.0);
     float reflet = pow(max(dot(N, H), 0.0), uHumide) * uBrillance;
     vec3 cire = cc * diffus + vec3(1.0, 0.96, 0.86) * reflet;
@@ -295,6 +349,9 @@ export class RenduGL {
   private champA: Cible | null = null;
   private champB: Cible | null = null;
   private marques: Cible | null = null;
+  private domeA: Cible | null = null;
+  private domeB: Cible | null = null;
+  private tailleDome = 0;
   private tailleChamp = 0;
   private donnees = new Float32Array(0);
   private indices = new Uint16Array(0);
@@ -319,7 +376,7 @@ export class RenduGL {
       this.perdu = true;
     });
     this.formatFlottant = !!gl.getExtension('EXT_color_buffer_float');
-    this.pMatiere = programme(gl, VS_MATIERE, FS_MATIERE, ['aPos', 'aDon']);
+    this.pMatiere = programme(gl, VS_MATIERE, FS_MATIERE, ['aPos', 'aDon', 'aLeve']);
     this.pFlou = programme(gl, VS_PLEIN, FS_FLOU, ['aPos']);
     this.pMarques = programme(gl, VS_MARQUES, FS_MARQUES, ['aPos', 'aCol', 'aTaille']);
     this.pScene = programme(gl, VS_SCENE, FS_SCENE, ['aPos']);
@@ -330,9 +387,11 @@ export class RenduGL {
     gl.bindVertexArray(this.vaoMatiere);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufMatiere);
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 24, 0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 4 * FLOTTANTS_PAR_POINT, 0);
     gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 24, 8);
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 4 * FLOTTANTS_PAR_POINT, 8);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 4 * FLOTTANTS_PAR_POINT, 24);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bufIndices);
 
     this.bufMarques = gl.createBuffer()!;
@@ -404,8 +463,11 @@ export class RenduGL {
 
   private preparerChamp(taille: number): void {
     if (taille === this.tailleChamp) return;
-    [this.champA, this.champB, this.marques].forEach((c) => this.libererCible(c));
+    [this.champA, this.champB, this.marques, this.domeA, this.domeB].forEach((c) => this.libererCible(c));
     this.tailleChamp = taille;
+    this.tailleDome = Math.max(32, Math.round(taille / 4));
+    this.domeA = this.creerCible(this.tailleDome, 2, this.formatFlottant);
+    this.domeB = this.creerCible(this.tailleDome, 2, this.formatFlottant);
     this.champA = this.creerCible(taille, 2, this.formatFlottant);
     this.champB = this.creerCible(taille, 2, this.formatFlottant);
     this.marques = this.creerCible(taille, 1, false);
@@ -430,7 +492,10 @@ export class RenduGL {
     const a = sim.fractionDePas();
 
     // 1. Les données de chaque point : position (lissée entre deux pas), colle, blanchiment, place au repos.
-    if (this.donnees.length !== n * 6) this.donnees = new Float32Array(n * 6);
+    if (this.donnees.length !== n * FLOTTANTS_PAR_POINT) this.donnees = new Float32Array(n * FLOTTANTS_PAR_POINT);
+    // Ce que la pince tient est tiré vers la caméra : encore plus haut.
+    const tenu = new Uint8Array(n);
+    if (sim.outil.ferme) for (const i of sim.outil.prise) tenu[i] = 1;
     const etir = new Float32Array(n);
     const seuilBlanc = o.blanchiment;
     for (let l = 0; l < b.lienA.length; l++) {
@@ -443,7 +508,7 @@ export class RenduGL {
     }
     const d = this.donnees;
     for (let i = 0; i < n; i++) {
-      const k = 6 * i;
+      const k = FLOTTANTS_PAR_POINT * i;
       if (sim.sorti[i]) {
         d[k] = 9;
         d[k + 1] = 9;
@@ -456,6 +521,8 @@ export class RenduGL {
       d[k + 3] = Math.min(1, etir[i]);
       d[k + 4] = b.x0[i] * 0.5 + 0.5;
       d[k + 5] = b.y0[i] * 0.5 + 0.5;
+      // La cire décollée se soulève (le « petit sac ») ; tenue par la pince, elle monte encore.
+      d[k + 6] = Math.min(1, (1 - tient) * 0.6 + (tenu[i] ? 0.4 : 0));
     }
     const nt = b.triangles.length / 3;
     if (this.indices.length < nt * 3) this.indices = new Uint16Array(nt * 3);
@@ -510,6 +577,19 @@ export class RenduGL {
     passe(A, B, pas, 0);
     passe(B, A, 0, pas);
 
+    // 3 bis. Le volume : le même champ, en petit et très flou, donne une masse bombée
+    // (épaisse au milieu, qui s'arrondit vers les bords).
+    const D1 = this.domeA!;
+    const D2 = this.domeB!;
+    const M0 = this.tailleDome;
+    gl.viewport(0, 0, M0, M0);
+    const pasDome = o.arrondi / (2 * ETENDUE) / PRISES;
+    passe(A, D1, pasDome, 0);
+    passe(D1, D2, 0, pasDome);
+    passe(D2, D1, pasDome, 0);
+    passe(D1, D2, 0, pasDome);
+    gl.viewport(0, 0, N, N);
+
     // 4. Les marques sur la peau : là où elle a été dégagée (elle s'éclaircit), et les rougeurs.
     const M = this.marques!;
     const marques: number[] = [];
@@ -551,6 +631,7 @@ export class RenduGL {
       ['uC0', A.tex[0]],
       ['uC1', A.tex[1]],
       ['uMarques', M.tex[0]],
+      ['uDome', D2.tex[0]],
       ['uBruit', this.texBruit],
     ];
     textures.forEach(([nom, t], k) => {
@@ -572,6 +653,10 @@ export class RenduGL {
     gl.uniform1f(this.u(s, 'uPeauPlis'), o.peauPlis);
     gl.uniform1f(this.u(s, 'uOmbre'), o.ombre);
     gl.uniform1f(this.u(s, 'uRayonPx'), o.rayon * o.ratio);
+    gl.uniform2f(this.u(s, 'uTexelDome'), 1 / M0, 1 / M0);
+    gl.uniform1f(this.u(s, 'uEpaisseur'), o.epaisseur);
+    gl.uniform1f(this.u(s, 'uContact'), o.contact);
+    gl.uniform1f(this.u(s, 'uLeve'), o.leve / (2 * ETENDUE));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
   }

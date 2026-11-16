@@ -297,6 +297,10 @@ export function afficherJeu(
         peauPlis: reglages.nombre('vue.peauPlis'),
         ombre: reglages.nombre('vue.ombre'),
         qualite: reglages.nombre('vue.qualite') / 100,
+        epaisseur: reglages.nombre('vue.epaisseur'),
+        arrondi: reglages.nombre('vue.arrondi') / 100,
+        contact: reglages.nombre('vue.contact'),
+        leve: reglages.nombre('vue.leve') / 100,
       });
     }
     dessiner(ctx, sim, dispo, peau, { temps, dureeRougeur, sursaut, blanchiment, parDessus: !!gl && !gl.perdu });
