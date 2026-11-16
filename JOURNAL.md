@@ -100,6 +100,17 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - Outils : Vite 8, TypeScript 7, Vitest 5, vite-plugin-pwa 2. Pas de PixiJS. Peau et cire en WebGL 2 (accord de Cyril, 2026-11-16), le reste en Canvas 2D ; si WebGL 2 manque ou lâche, tout repasse en Canvas 2D.
 - La page de jeu expose `window.satisfapp` (simulation en cours) pour les vérifications automatiques.
 
+## Plan V2 proposé à Cyril (2026-11-16, en attente de son accord)
+
+Demande de Cyril : de la profondeur **dans le conduit** (tunnel en perspective) ; la cire collée sur les parois près de l'entrée, qui s'amasse en bouchon au fond ; une matière moins « goutte qui coule » : moins brillante/miel, bords arrachés (pas ronds), moins élastique, texture compacte ; des parties liquides, d'autres très dures, d'autres très collantes ; plusieurs instruments à tour de rôle pour tout nettoyer et retrouver une oreille propre.
+
+Principe technique proposé : la matière reste calculée « à plat » (ce qui garde la sensation au doigt), mais sur deux surfaces : la paroi du conduit (un tube déroulé) et le fond. L'image replie ce tube en perspective.
+
+- **V2-1 — Le conduit en profondeur** : tunnel rose qui fuit vers le fond, bouchon au fond, léger effet 3D quand l'outil bouge ; outils vus en perspective.
+- **V2-2 — Une cire plus vraie** : mate, brun-orangé, grain en couches/grumeaux, bords arrachés aux déchirures, moins élastique (résiste puis cède) ; trois natures dans un même bouchon : dure, collante, molle.
+- **V2-3 — La cire sur les parois** : traînées et plaques collées sur la paroi près de l'entrée, de plus en plus épaisses vers le fond jusqu'au bouchon.
+- **V2-4 — Les instruments à tour de rôle** : coton-tige (absorbe le mou/liquide, essuie la paroi), aspirateur (liquide et miettes), spatule (décolle le dur et le collant), pince (sort les morceaux) ; fin = oreille propre et belle.
+
 ## Historique
 
 ### 2026-11-16 — V2 : la profondeur du bouchon
