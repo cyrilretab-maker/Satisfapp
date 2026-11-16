@@ -4,7 +4,11 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
-- **Lot 2 — Spatule et paroi : VALIDÉ** par Cyril le 2026-11-16. **Prochain : lot 3 (tension qui se sent : vibration, sons, blanchiment), en attente du feu vert.**
+- **Lots 3, 4 et 5 : construits d'une traite à la demande de Cyril (2026-11-16), testés automatiquement, mis en ligne. En attente de son test au doigt et à l'œil.**
+  - [ ] Lot 3 : Cyril sent venir la casse les yeux fermés (au doigt simulé : les pulsations commencent plus d'une seconde avant la première déchirure, sur 4 bouchons).
+  - [ ] Lot 4 : l'écran rappelle les captures de référence, sans paraître sale ni choquant.
+  - [ ] Lot 5 : une partie complète s'enchaîne sans bouton inutile.
+- **Lot 2 — Spatule et paroi : VALIDÉ** par Cyril le 2026-11-16.
   - [x] Impossible de sortir un gros morceau sans avoir fait le tour.
   - [x] Toucher la paroi se remarque sans punir.
 - **Lot 1 — Matière brute : VALIDÉ** par Cyril le 2026-11-16.
@@ -35,6 +39,21 @@ Chaque session repart d'ici. Le plus récent en haut.
 - **Paroi sensible :** la spatule qui bouge à plus de 0,08 de toute matière touche la peau ; la pince ouverte qui bouge dans l'anneau de la paroi la racle. Pas plus d'un contact toutes les 0,3 s. Réaction : vibration brève (110 ms), sursaut de l'image (4 px), rougeur qui s'estompe en 30 s. Aucune conséquence sur le bouchon.
 - **On commence avec la spatule en main** (pour chercher où passer dessous).
 - La cire se tasse plus facilement qu'elle ne s'étire (compression 3 fois plus souple), pour que le bord puisse se replier.
+
+### Choix faits pendant les lots 3 à 5 (à faire valider par Cyril)
+- **La tension ressentie** = l'étirement du lien le plus tendu rapporté à sa limite, seulement quand la pince tient franchement de la matière décollée.
+- **Vibration :** pulsations de durée fixe (110 ms, au-dessus du seuil senti par Cyril) ; c'est la **pause** qui raccourcit avec la tension (650 → 70 ms). Elles commencent à 25 % de tension.
+- **Rupture** = au moins un lien qui casse pendant que le doigt est posé : arrêt net, claquement, silence, puis un coup bref (140 ms) ; reprise après 0,7 s.
+- **Grande sortie** = un morceau d'au moins 35 % du bouchon qui sort : arrêt net, décollement ample, silence 0,7 s, puis une longue vibration (800 ms). La vibration web ne sait pas être « douce » : c'est une vibration longue.
+- **Sons fabriqués par le code :** frottement doux (bruit filtré continu), craquements (salves courtes, plus aiguës et rapprochées quand la tension monte), claquement, décollement (glissement qui descend), tic de spatule, clic de pince. Un volume par famille.
+- **Blanchiment :** la cire pâlit vers le crème au-delà de 55 % de son étirement maximal (les zones faibles blanchissent donc plus tôt : c'est ainsi qu'on les devine).
+- **Habillage :** peau rosée sur la paroi, fond sombre au milieu, cire ambre (collée) à miel (décollée), un peu translucide, bord plus sombre, reflet central de la lumière de la caméra et quelques points humides, vignettage sombre de l'endoscope, outils métalliques. La peau dégagée s'éclaircit en 2,5 s.
+- **Sortie :** le morceau grossit (+25 %) en 0,35 s, puis file vers le bocal en 0,55 s.
+- **Bocal :** icône en haut à gauche (un pot qui se remplit). Ouvert : le plus gros morceau en grand sur un halo, les autres du plus gros au plus petit, à la même échelle, sans aucun chiffre. « Vider le bocal » demande une confirmation. 100 morceaux au plus (on oublie le plus petit, jamais le plus gros).
+- **Fin :** conduit vide → silence, puis « Nouveau bouchon » après 1,5 s de calme.
+- **Reprise :** la partie est sauvée toutes les 2 s, à chaque morceau sorti et quand on quitte ; on la retrouve à la réouverture (même terminée).
+- La flèche de retour est passée en bas à gauche (le bocal a pris le coin en haut à gauche).
+- Un point du tour au bord d'un trou compte comme « à côté d'un bord libre » (sinon il pouvait rester impossible à décoller).
 
 ### Réglages retenus
 
@@ -71,15 +90,20 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - `src/reglages/reglages.ts` : lit le fichier, garde sur le téléphone seulement ce que Cyril a modifié.
 - `src/reglages/panneau.ts` : panneau caché (trois appuis en haut à droite) ; la page en cours peut y ajouter des actions (Nouveau bouchon, Rejouer le même bouchon).
 - `src/matiere/` : **le moteur, sans écran.** `bouchon.ts` fabrique un bouchon à partir d'un numéro de tirage ; `moteur.ts` applique les règles (liens qui cassent au pic, colle du fond qui s'use sous tension modérée, colle du tour, spatule, pince, repli, paroi) ; `parametres.ts` traduit les réglages pour le moteur.
-- `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (pavé tactile), `dessin.ts` (formes grises), `peau.ts` (rougeurs et sursaut).
+- `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (pavé tactile), `dessin.ts` (habillage), `peau.ts` (rougeurs et sursaut), `bocal.ts` (bocal), `sortie.ts` (morceaux qui volent vers le bocal), `sauvegarde.ts` (reprise de partie).
 - `src/pages/` : page de lancement, page du bouchon (`jeu.ts`), page de test vibration et son.
-- `src/sensations/` : couche vibration (remplaçable par Capacitor), couche son, motifs de rythme.
+- `src/sensations/` : couche vibration (remplaçable par Capacitor), `tension.ts` (pilote : pulsations, craquements, silences), `sons-matiere.ts` (sons fabriqués), `parametres-sensations.ts`, motifs de rythme du lot 0.
 - `tests/` : tests automatiques (`npm test`). `tests/outils/doigt-simule.ts` = le doigt simulé.
 - `.github/workflows/publier.yml` : à chaque envoi sur `main`, tests, puis construction et mise en ligne.
 - Outils : Vite 8, TypeScript 7, Vitest 5, vite-plugin-pwa 2. Pas de PixiJS (dessin Canvas 2D).
 - La page de jeu expose `window.satisfapp` (simulation en cours) pour les vérifications automatiques.
 
 ## Historique
+
+### 2026-11-16 — Lots 3, 4 et 5 construits d'une traite
+- Cyril demande d'enchaîner les lots 3, 4 et 5 sans s'arrêter entre eux.
+- Lot 3 : pilote de tension, sons fabriqués, blanchiment, tics de spatule. Lot 4 : habillage complet. Lot 5 : sortie animée, bocal permanent, fin de partie, sauvegarde et reprise.
+- ~64 réglages au panneau. 60 tests automatiques.
 
 ### 2026-11-16 — Lot 2 validé
 - Cyril confirme au doigt les deux critères du lot 2.

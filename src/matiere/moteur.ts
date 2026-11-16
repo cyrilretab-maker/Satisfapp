@@ -17,6 +17,22 @@ import type { Bouchon } from './bouchon';
 
 export type TypeOutil = 'pince' | 'spatule';
 
+/** Ce qu'il faut garder pour retrouver une partie en cours. */
+export interface EtatSimulation {
+  temps: number;
+  x: number[];
+  y: number[];
+  colleAuFond: string; // une suite de 0 et de 1
+  sante: number[];
+  colleAuTour: string;
+  santeTour: number[];
+  lienOk: string;
+  sorti: string;
+  sortiA: number[];
+  morceauxSortis: number[];
+  outil: TypeOutil;
+}
+
 export interface ParamsMatiere {
   solidite: number; // force qui casse un lien normal
   elasticite: number; // allongement relatif possible avant rupture (0.5 = +50 %)
@@ -50,7 +66,7 @@ export type Evenement =
   | { type: 'pointDecolle'; point: number }
   | { type: 'tourDecolle'; point: number }
   | { type: 'paroiTouchee'; x: number; y: number }
-  | { type: 'morceauSorti'; points: number; part: number };
+  | { type: 'morceauSorti'; points: number; part: number; indices: number[] };
 
 // Constantes techniques (pas des sensations) :
 const PAS = 1 / 60; // pas de temps fixe, en secondes
@@ -486,7 +502,7 @@ export class Simulation {
     const b = this.b;
     for (let k = b.voisinsDebut[i]; k < b.voisinsDebut[i + 1]; k++) {
       const v = b.voisins[k];
-      if (!this.lienOk[b.voisinsLien[k]]) return true; // déchirure : un bord libre
+      if (!this.lienOk[b.voisinsLien[k]] || this.sorti[v]) return true; // déchirure ou trou : un bord libre
       if (b.bord[v] && !this.colleAuTour[v]) return true;
     }
     return false;
@@ -604,6 +620,55 @@ export class Simulation {
     o.y = sy / o.prise.length;
   }
 
+  // ---------- Sauvegarde ----------
+
+  /** L'état complet de la partie, pour la retrouver telle quelle plus tard. */
+  exporter(): EtatSimulation {
+    const arrondi = (t: Float64Array) => Array.from(t, (v) => Math.round(v * 1e5) / 1e5);
+    const bits = (t: Uint8Array) => Array.from(t, (v) => (v ? '1' : '0')).join('');
+    return {
+      temps: this.temps,
+      x: arrondi(this.x),
+      y: arrondi(this.y),
+      colleAuFond: bits(this.colleAuFond),
+      sante: arrondi(this.sante),
+      colleAuTour: bits(this.colleAuTour),
+      santeTour: arrondi(this.santeTour),
+      lienOk: bits(this.lienOk),
+      sorti: bits(this.sorti),
+      sortiA: arrondi(this.sortiA),
+      morceauxSortis: [...this.morceauxSortis],
+      outil: this.outil.type,
+    };
+  }
+
+  /** Reprend une partie sauvegardée (même bouchon). Renvoie faux si l'état ne correspond pas. */
+  importer(e: EtatSimulation): boolean {
+    const n = this.n;
+    const nl = this.b.lienA.length;
+    if (e.x.length !== n || e.lienOk.length !== nl || e.colleAuFond.length !== n) return false;
+    const lireBits = (cible: Uint8Array, texte: string) => {
+      for (let i = 0; i < cible.length; i++) cible[i] = texte[i] === '1' ? 1 : 0;
+    };
+    this.temps = e.temps;
+    this.x.set(e.x);
+    this.y.set(e.y);
+    this.vx.fill(0);
+    this.vy.fill(0);
+    lireBits(this.colleAuFond, e.colleAuFond);
+    this.sante.set(e.sante);
+    lireBits(this.colleAuTour, e.colleAuTour);
+    this.santeTour.set(e.santeTour);
+    lireBits(this.lienOk, e.lienOk);
+    lireBits(this.sorti, e.sorti);
+    this.sortiA.set(e.sortiA);
+    this.morceauxSortis.length = 0;
+    this.morceauxSortis.push(...e.morceauxSortis);
+    this.outil.type = e.outil;
+    this.calculerMorceaux();
+    return true;
+  }
+
   // ---------- Morceaux ----------
 
   /** Regroupe les points reliés entre eux en morceaux, et note lesquels tiennent encore. */
@@ -669,16 +734,16 @@ export class Simulation {
         q++;
       }
       if (Math.hypot(sx / q, sy / q) <= BORD_DE_LA_VUE) continue;
-      let k = 0;
+      const indices: number[] = [];
       for (let j = 0; j < this.n; j++) {
         if (this.morceau[j] !== m) continue;
         this.sorti[j] = 1;
         this.sortiA[j] = this.temps;
-        k++;
+        indices.push(j);
       }
-      const part = k / this.n;
+      const part = indices.length / this.n;
       this.morceauxSortis.push(part);
-      this.evenements.push({ type: 'morceauSorti', points: k, part });
+      this.evenements.push({ type: 'morceauSorti', points: indices.length, part, indices });
       this.morceauxAJour = false;
     }
     if (vus.size > 0) {

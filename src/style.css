@@ -101,8 +101,8 @@ h1 { margin: 0; font-weight: 600; }
 .jeu-toile { display: block; touch-action: none; }
 .jeu-retour {
   position: fixed;
-  top: 8px;
-  left: 8px;
+  bottom: 4px;
+  left: 4px;
   padding: 8px 14px;
   color: var(--gris);
   text-decoration: none;
@@ -119,3 +119,27 @@ h1 { margin: 0; font-weight: 600; }
 .jeu-outils { position: fixed; display: flex; gap: 12px; }
 .jeu-outils button { flex: 1; font-size: 1.05rem; padding: 0; }
 .jeu-outils button.actif { background: #5a5a5a; border-color: #9a9a9a; color: #fff; }
+
+/* Le bocal, toujours visible dans le coin en haut à gauche */
+.jeu-bocal {
+  position: fixed;
+  top: 4px;
+  left: 4px;
+  width: 60px;
+  height: 60px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  z-index: 5;
+}
+.jeu-bocal canvas { width: 56px; height: 56px; }
+.bocal-ouvert {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  background: rgba(16, 11, 10, 0.97);
+  display: flex;
+  flex-direction: column;
+}
+.bocal-actions { display: flex; gap: 12px; padding: 16px; margin-top: auto; }
+.bocal-actions button { flex: 1; }

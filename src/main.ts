@@ -31,7 +31,7 @@ function router(): void {
   quitterPage?.();
   quitterPage = undefined;
   if (location.hash === '#jeu') {
-    quitterPage = afficherJeu(racine, reglages, vibration);
+    quitterPage = afficherJeu(racine, reglages, vibration, stockageDuTelephone());
   } else if (location.hash === '#test') {
     quitterPage = afficherTestVibration(racine, reglages, vibration, son);
   } else {

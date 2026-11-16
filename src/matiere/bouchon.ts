@@ -19,6 +19,7 @@ export interface ParamsBouchon {
 
 export interface Bouchon {
   graine: number;
+  params: ParamsBouchon; // les réglages de forme qui l'ont fabriqué (pour le refaire à l'identique)
   nbPoints: number;
   x0: Float64Array; // position de départ de chaque point (= où il est collé au fond)
   y0: Float64Array;
@@ -221,6 +222,7 @@ export function genererBouchon(graine: number, p: ParamsBouchon): Bouchon {
 
   return {
     graine,
+    params: { ...p },
     nbPoints: n,
     x0: Float64Array.from(xs),
     y0: Float64Array.from(ys),
