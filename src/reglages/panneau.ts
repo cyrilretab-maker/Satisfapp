@@ -4,6 +4,19 @@
 
 import type { DefinitionReglage, Reglages } from './reglages';
 
+/** Une action proposée en haut du panneau par la page en cours (ex. « Nouveau bouchon »). */
+export interface ActionPanneau {
+  libelle: string;
+  faire: () => void;
+}
+
+let actionsDeLaPage: () => ActionPanneau[] = () => [];
+
+/** La page en cours déclare ses actions ; elles apparaissent en haut du panneau. */
+export function definirActionsPanneau(fournir: () => ActionPanneau[]): void {
+  actionsDeLaPage = fournir;
+}
+
 const APPUIS_POUR_OUVRIR = 3;
 const FENETRE_APPUIS = 1200; // ms : les trois appuis doivent tenir dans ce délai
 
@@ -39,6 +52,20 @@ function ouvrir(reglages: Reglages): void {
 
   const dessiner = () => {
     contenu.replaceChildren();
+    const actions = actionsDeLaPage();
+    if (actions.length > 0) {
+      const zone = document.createElement('div');
+      zone.className = 'panneau-actions';
+      for (const a of actions) {
+        zone.append(
+          bouton(a.libelle, () => {
+            a.faire();
+            panneau.remove();
+          }),
+        );
+      }
+      contenu.append(zone);
+    }
     for (const groupe of reglages.fichier.groupes) {
       const membres = reglages.liste().filter((d) => d.groupe === groupe.id);
       if (membres.length === 0) continue;
@@ -64,6 +91,27 @@ function ligne(reglages: Reglages, def: DefinitionReglage): HTMLElement {
   const nom = document.createElement('span');
   nom.className = 'reglage-nom';
   nom.textContent = def.libelle;
+  if (def.prochainBouchon) {
+    const note = document.createElement('small');
+    note.className = 'reglage-note';
+    note.textContent = ' (prochain bouchon)';
+    nom.append(note);
+  }
+
+  if (def.type === 'choix') {
+    const choix = document.createElement('span');
+    choix.className = 'reglage-choix';
+    for (const o of def.options) {
+      const b = bouton(o.libelle, () => {
+        reglages.ecrire(def.id, o.valeur);
+        choix.querySelectorAll('button').forEach((x) => x.classList.toggle('actif', x === b));
+      });
+      b.classList.toggle('actif', reglages.texte(def.id) === o.valeur);
+      choix.append(b);
+    }
+    bloc.append(nom, choix);
+    return bloc;
+  }
 
   if (def.type === 'interrupteur') {
     const caseACocher = document.createElement('input');

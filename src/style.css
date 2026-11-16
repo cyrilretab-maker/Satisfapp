@@ -89,3 +89,30 @@ h1 { margin: 0; font-weight: 600; }
 .reglage-interrupteur { flex-direction: row; justify-content: space-between; align-items: center; }
 .reglage input[type='range'] { width: 100%; height: 32px; }
 .reglage input[type='checkbox'] { width: 26px; height: 26px; }
+.panneau-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.reglage-note { color: var(--gris); font-size: 0.8em; }
+.reglage-choix { display: flex; gap: 8px; }
+.reglage-choix button { flex: 1; padding: 10px; }
+.reglage-choix button.actif { background: #555; border-color: #888; }
+.lien-discret { color: var(--gris); margin-top: 12px; }
+
+/* Écran de jeu */
+.jeu { position: fixed; inset: 0; overflow: hidden; }
+.jeu-toile { display: block; touch-action: none; }
+.jeu-retour {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  padding: 8px 14px;
+  color: var(--gris);
+  text-decoration: none;
+  font-size: 1.3rem;
+}
+.jeu-nouveau {
+  position: fixed;
+  left: 50%;
+  bottom: 18%;
+  transform: translateX(-50%);
+  font-size: 1.2rem;
+  padding: 18px 28px;
+}

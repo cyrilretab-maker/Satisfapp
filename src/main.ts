@@ -7,6 +7,7 @@ import { creerVibrationWeb } from './sensations/vibration';
 import { creerSonWeb } from './sensations/son';
 import { afficherAccueil } from './pages/accueil';
 import { afficherTestVibration } from './pages/test-vibration';
+import { afficherJeu } from './pages/jeu';
 
 registerSW({ immediate: true }); // rend l'app utilisable hors connexion
 
@@ -29,7 +30,9 @@ let quitterPage: (() => void) | undefined;
 function router(): void {
   quitterPage?.();
   quitterPage = undefined;
-  if (location.hash === '#test') {
+  if (location.hash === '#jeu') {
+    quitterPage = afficherJeu(racine, reglages, son);
+  } else if (location.hash === '#test') {
     quitterPage = afficherTestVibration(racine, reglages, vibration, son);
   } else {
     afficherAccueil(racine);
