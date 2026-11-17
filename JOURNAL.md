@@ -5,14 +5,14 @@ Chaque session repart d'ici. Le plus récent en haut.
 ## État actuel
 
 ### Mini-jeu 2 — L'eau (`docs/Cahier des charges 2 eau.md`)
-- **Lots 0 à 5 : construits d'une traite à la demande de Cyril (2026-11-17), testés automatiquement, en ligne. En attente de son test au doigt.**
-  - [ ] Lot 0 : on passe du bouchon à l'eau depuis l'écran de choix ; le bouchon fonctionne toujours (vérifié dans le navigateur).
-  - [ ] Lot 1 : un tracé lent relie deux flaques, un tracé trop rapide coupe la route, Cyril reconnaît la route qui s'élargit.
+- **Lots 0 à 5 : VALIDÉS par Cyril le 2026-11-17** (« oui tout est validé »). Reste le lot 6 (dix minutes en salle d'attente), mené par Cyril.
+  - [x] Lot 0 : on passe du bouchon à l'eau depuis l'écran de choix ; le bouchon fonctionne toujours (vérifié dans le navigateur).
+  - [x] Lot 1 : un tracé lent relie deux flaques, un tracé trop rapide coupe la route, Cyril reconnaît la route qui s'élargit.
     - 2026-11-17 : Cyril : « c'est super, l'eau suit bien le doigt ». Restent à confirmer : la coupure par la vitesse, la route qui s'élargit, les lots 2 à 5.
-  - [ ] Lot 2 : toute l'eau peut être menée au rebord ; la goutte tient jusqu'au toucher, puis se vide d'un coup.
-  - [ ] Lot 3 : Cyril sent une flaque se vider dans une autre, les yeux fermés.
-  - [ ] Lot 4 : l'écran rappelle un vrai égouttoir mouillé.
-  - [ ] Lot 5 : une partie complète s'enchaîne sans bouton inutile.
+  - [x] Lot 2 : toute l'eau peut être menée au rebord ; la goutte tient jusqu'au toucher, puis se vide d'un coup.
+  - [x] Lot 3 : Cyril sent une flaque se vider dans une autre, les yeux fermés.
+  - [x] Lot 4 : l'écran rappelle un vrai égouttoir mouillé.
+  - [x] Lot 5 : une partie complète s'enchaîne sans bouton inutile.
   - Lot 6 (dix minutes en salle d'attente) : mené par Cyril.
 - Hypothèses du cahier des charges : prises telles quelles (pas de réponse contraire de Cyril).
 - Pas encore de vidéos de l'évier de Cyril dans `docs/references`.
@@ -127,6 +127,9 @@ Principe technique proposé : la matière reste calculée « à plat » (ce qui 
 - **V2-4 — Les instruments à tour de rôle** : coton-tige (absorbe le mou/liquide, essuie la paroi), aspirateur (liquide et miettes), spatule (décolle le dur et le collant), pince (sort les morceaux) ; fin = oreille propre et belle.
 
 ## Historique
+
+### 2026-11-17 — L'eau : lots 0 à 5 validés
+- Cyril : « c'est super, l'eau suit bien le doigt », puis « oui tout est validé ». Prochaine étape selon la vision : le mini-jeu 3 (la pression), dont le cahier des charges reste à écrire.
 
 ### 2026-11-17 — Mini-jeu 2 « l'eau », lots 0 à 5 construits
 - **Lot 0** : écran de choix (Le bouchon / L'eau), page `#eau`, six groupes de réglages « L'eau : … ». Ajouté au panneau, pour les deux jeux (le cahier des charges les donnait pour déjà faites) : **Copier le réglage** (copie les valeurs modifiées, à coller dans un message) et **Enregistrer comme variante** (liste de variantes à recharger ou oublier).
