@@ -8,6 +8,7 @@ import { creerSonWeb } from './sensations/son';
 import { afficherAccueil } from './pages/accueil';
 import { afficherTestVibration } from './pages/test-vibration';
 import { afficherJeu } from './pages/jeu';
+import { afficherEau } from './pages/eau';
 
 registerSW({ immediate: true }); // rend l'app utilisable hors connexion
 
@@ -32,6 +33,8 @@ function router(): void {
   quitterPage = undefined;
   if (location.hash === '#jeu') {
     quitterPage = afficherJeu(racine, reglages, vibration, stockageDuTelephone());
+  } else if (location.hash === '#eau') {
+    quitterPage = afficherEau(racine, reglages, vibration, stockageDuTelephone());
   } else if (location.hash === '#test') {
     quitterPage = afficherTestVibration(racine, reglages, vibration, son);
   } else {

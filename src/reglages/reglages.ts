@@ -99,6 +99,29 @@ export class Reglages {
     this.ecouteurs.forEach((f) => f(id));
   }
 
+  /** Les valeurs qui diffèrent du fichier de données (ce que Cyril a réglé). */
+  modifies(): Record<string, ValeurReglage> {
+    const m: Record<string, ValeurReglage> = {};
+    for (const def of this.definitions.values()) {
+      const v = this.valeurs.get(def.id);
+      if (v !== undefined && v !== def.valeur) m[def.id] = v;
+    }
+    return m;
+  }
+
+  /** Repart des valeurs du fichier, puis applique celles-ci (une variante enregistrée). */
+  appliquer(valeurs: Record<string, unknown>): void {
+    for (const def of this.definitions.values()) this.valeurs.set(def.id, def.valeur);
+    for (const [id, v] of Object.entries(valeurs)) {
+      const def = this.definitions.get(id);
+      if (!def) continue;
+      const propre = nettoyer(def, v);
+      if (propre !== undefined) this.valeurs.set(id, propre);
+    }
+    this.enregistrer();
+    this.definitions.forEach((_, id) => this.ecouteurs.forEach((f) => f(id)));
+  }
+
   /** Remet toutes les valeurs du fichier de données. */
   toutRemettre(): void {
     for (const def of this.definitions.values()) this.valeurs.set(def.id, def.valeur);

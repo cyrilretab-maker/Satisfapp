@@ -4,6 +4,19 @@ Chaque session repart d'ici. Le plus récent en haut.
 
 ## État actuel
 
+### Mini-jeu 2 — L'eau (`docs/Cahier des charges 2 eau.md`)
+- **Lots 0 à 5 : construits d'une traite à la demande de Cyril (2026-11-17), testés automatiquement, en ligne. En attente de son test au doigt.**
+  - [ ] Lot 0 : on passe du bouchon à l'eau depuis l'écran de choix ; le bouchon fonctionne toujours (vérifié dans le navigateur).
+  - [ ] Lot 1 : un tracé lent relie deux flaques, un tracé trop rapide coupe la route, Cyril reconnaît la route qui s'élargit.
+  - [ ] Lot 2 : toute l'eau peut être menée au rebord ; la goutte tient jusqu'au toucher, puis se vide d'un coup.
+  - [ ] Lot 3 : Cyril sent une flaque se vider dans une autre, les yeux fermés.
+  - [ ] Lot 4 : l'écran rappelle un vrai égouttoir mouillé.
+  - [ ] Lot 5 : une partie complète s'enchaîne sans bouton inutile.
+  - Lot 6 (dix minutes en salle d'attente) : mené par Cyril.
+- Hypothèses du cahier des charges : prises telles quelles (pas de réponse contraire de Cyril).
+- Pas encore de vidéos de l'évier de Cyril dans `docs/references`.
+
+### Mini-jeu 1 — Le bouchon
 - **V2 (lots V2-1 à V2-4) : construite d'une traite à la demande de Cyril (2026-11-16), testée automatiquement, en ligne. En attente de son retour au doigt et à l'œil.**
 - **Lot 6 (essai en situation réelle) :** mené par Cyril lui-même.
 - **Lots 3, 4 et 5 — Tension, habillage, bocal : VALIDÉS** par Cyril le 2026-11-16.
@@ -95,6 +108,7 @@ Résultats lot 1 au doigt simulé, sur 10 bouchons : tirer fort (3 unités/s) �
 - `src/jeu/` : l'écran de jeu. `ecran.ts` (disposition), `commande.ts` (pavé tactile), `rendu-gl.ts` (dessin réaliste par la puce graphique : conduit, tympan, cire des parois, bouchon), `perspective.ts` (le conduit en profondeur), `bruit.ts` (texture de grain), `dessin.ts` (outils, bord de la vue, zone du pouce ; et dessin simple de secours), `peau.ts` (rougeurs et sursaut), `bocal.ts` (bocal), `sortie.ts` (morceaux qui volent vers le bocal), `sauvegarde.ts` (reprise de partie).
 - `src/pages/` : page de lancement, page du bouchon (`jeu.ts`), page de test vibration et son.
 - `src/sensations/` : couche vibration (remplaçable par Capacitor), `tension.ts` (pilote : pulsations, craquements, silences), `sons-matiere.ts` (sons fabriqués), `parametres-sensations.ts`, motifs de rythme du lot 0.
+- `src/eau/` : **le mini-jeu 2 (l'eau)**, séparé du bouchon : `moteur-eau.ts` (règles), `parametres-eau.ts`, `sensations-eau.ts` (vibrations), `sons-eau.ts`, `vase.ts`, `ecran-eau.ts` (disposition), `rendu-eau-gl.ts` (dessin réaliste), `dessin-eau.ts` (formes grises). Page : `src/pages/eau.ts`.
 - `tests/` : tests automatiques (`npm test`). `tests/outils/doigt-simule.ts` = le doigt simulé.
 - `.github/workflows/publier.yml` : à chaque envoi sur `main`, tests, puis construction et mise en ligne.
 - Outils : Vite 8, TypeScript 7, Vitest 5, vite-plugin-pwa 2. Pas de PixiJS. Peau et cire en WebGL 2 (accord de Cyril, 2026-11-16), le reste en Canvas 2D ; si WebGL 2 manque ou lâche, tout repasse en Canvas 2D.
@@ -112,6 +126,23 @@ Principe technique proposé : la matière reste calculée « à plat » (ce qui 
 - **V2-4 — Les instruments à tour de rôle** : coton-tige (absorbe le mou/liquide, essuie la paroi), aspirateur (liquide et miettes), spatule (décolle le dur et le collant), pince (sort les morceaux) ; fin = oreille propre et belle.
 
 ## Historique
+
+### 2026-11-17 — Mini-jeu 2 « l'eau », lots 0 à 5 construits
+- **Lot 0** : écran de choix (Le bouchon / L'eau), page `#eau`, six groupes de réglages « L'eau : … ». Ajouté au panneau, pour les deux jeux (le cahier des charges les donnait pour déjà faites) : **Copier le réglage** (copie les valeurs modifiées, à coller dans un message) et **Enregistrer comme variante** (liste de variantes à recharger ou oublier).
+- **Lot 1 — moteur de l'eau** (`src/eau/moteur-eau.ts`, séparé du bouchon) : grille 64 × 104 cases vue du dessus. Chaque case : hauteur d'eau, mouillé (et depuis quand), route. Règles :
+  - une case sèche n'accepte l'eau que si la voisine dépasse l'« accroche » (la flaque tient) ;
+  - le doigt mouille (la route) et entraîne l'eau qu'il quitte ; trop rapide (> 70 cases/s), la trace se brise en taches isolées où l'eau ne passe pas ;
+  - l'eau s'engage après l'« hésitation » (250 ms) ; elle ne passe jamais vers un sol plus haut ; dans une route, l'eau fine court vers le bas (pente × 600 cases/s environ), une flaque épaisse reste en place ;
+  - le débit élargit la route (au plus « élargissement » cases/s) ; une route sans eau sèche après « durée d'une trace » ;
+  - un film reste derrière l'eau (une petite flaque s'épuise), puis **perle** en gouttelettes espacées (une par carré de 4 × 4 cases, place tirée au hasard) quand plus rien ne coule ; l'inox redevient sec ;
+  - deux flaques qui se rejoignent : événement « jonction » ;
+  - rien ne se perd (vérifié par les tests) ; les flaques naissent « posées » sur la pente (surface à plat).
+- **Lot 2 — rebord** : le rebord est un petit ressaut où l'eau se rassemble en goutte ; le long du rebord, une goutte ne rejoint sa voisine que bien pleine (70 % de la capacité) ; trop-plein en mince filet ; toucher qui glisse vers l'évier = la goutte se vide (au plus 3 s), l'eau ruisselle sur la paroi ; la coulée part au vase.
+- **Lot 3 — sensations** (`sensations-eau.ts`, `sons-eau.ts`) : pulsations au rythme du débit (pause 800 → 140 ms), frémissement quand le doigt est dans l'eau, coup bref + « plop » à la jonction, goutte qui pulse de plus en plus vite, toucher final = arrêt net, puis longue vibration qui décroît ; ruissellement, clapotis, frottement sur l'inox très doux (10 %), coulée et dernière goutte.
+- **Lot 4 — habillage** (`rendu-eau-gl.ts`) : inox brossé, eau transparente (l'inox déformé au travers), fin bord sombre, reflets, trace mouillée plus mate, rebord roulé, goutte qui pend, eau qui ruisselle sur la paroi. Formes grises en secours (`dessin-eau.ts`).
+- **Lot 5** : vase (coulées, la plus grosse mise en avant, sans chiffre), fin (inox vide < 2 %, silence, bouton « Nouvel évier »), reprise de partie, « Rejouer le même évier ».
+- Réglages retenus au départ : pente 0,02, accroche 1,35, fluidité 40, élargissement 1,5, film 0,04, capacité 3, vidange 1,8, 6 flaques de rayon 5.
+- Calcul ≈ 0,3 ms par image sur ordinateur. 104 tests (dont 20 pour l'eau).
 
 ### 2026-11-16 — V2 construite (lots V2-1 à V2-4)
 - **Principe** : la matière reste calculée à plat (sensation au doigt inchangée) : le fond est le disque de rayon 0,95 (le bouchon), la paroi est l'anneau 0,95 → 1,35 « déroulé ». L'image replie l'anneau en tunnel (`src/jeu/perspective.ts`, même calcul dans le dessin par la puce graphique).

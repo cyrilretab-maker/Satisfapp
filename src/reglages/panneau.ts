@@ -19,6 +19,45 @@ export function definirActionsPanneau(fournir: () => ActionPanneau[]): void {
 }
 
 const APPUIS_POUR_OUVRIR = 3;
+export const CLE_VARIANTES = 'satisfapp.variantes.v1';
+
+export interface Variante {
+  nom: string;
+  valeurs: Record<string, unknown>;
+}
+
+function lireVariantes(): Variante[] {
+  try {
+    const lu = JSON.parse(localStorage.getItem(CLE_VARIANTES) ?? '[]');
+    return Array.isArray(lu) ? lu.filter((v) => v && typeof v.nom === 'string' && typeof v.valeurs === 'object') : [];
+  } catch {
+    return [];
+  }
+}
+
+function ecrireVariantes(v: Variante[]): void {
+  try {
+    localStorage.setItem(CLE_VARIANTES, JSON.stringify(v));
+  } catch {
+    /* stockage plein ou bloqué */
+  }
+}
+
+/** Copie un texte (le réglage) pour pouvoir le coller dans un message. */
+async function copier(texte: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(texte);
+    return true;
+  } catch {
+    const zone = document.createElement('textarea');
+    zone.value = texte;
+    document.body.append(zone);
+    zone.select();
+    const ok = document.execCommand?.('copy') ?? false;
+    zone.remove();
+    return ok;
+  }
+}
 const FENETRE_APPUIS = 1200; // ms : les trois appuis doivent tenir dans ce délai
 
 export function installerPanneau(reglages: Reglages, coin: HTMLElement): void {
@@ -67,6 +106,49 @@ function ouvrir(reglages: Reglages): void {
       }
       contenu.append(zone);
     }
+    // Les actions communes à tous les mini-jeux : copier le réglage, enregistrer une variante.
+    const communes = document.createElement('div');
+    communes.className = 'panneau-actions';
+    const boutonCopier = bouton('Copier le réglage', async () => {
+      const ok = await copier(JSON.stringify(reglages.modifies(), null, 1));
+      boutonCopier.textContent = ok ? 'Réglage copié : à coller dans un message' : 'Copie impossible sur ce téléphone';
+      setTimeout(() => (boutonCopier.textContent = 'Copier le réglage'), 2500);
+    });
+    communes.append(
+      boutonCopier,
+      bouton('Enregistrer comme variante', () => {
+        const liste = lireVariantes();
+        const date = new Date();
+        const nom = `Variante ${liste.length + 1} (${date.toLocaleDateString('fr-FR')} ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })})`;
+        liste.push({ nom, valeurs: reglages.modifies() });
+        ecrireVariantes(liste);
+        dessiner();
+      }),
+    );
+    const variantes = lireVariantes();
+    for (let k = 0; k < variantes.length; k++) {
+      const v = variantes[k];
+      const ligneV = document.createElement('div');
+      ligneV.className = 'panneau-variante';
+      const charger = bouton(`Charger « ${v.nom} »`, () => {
+        reglages.appliquer(v.valeurs);
+        dessiner();
+      });
+      const oublier = bouton('×', () => {
+        if (oublier.dataset.sur !== '1') {
+          oublier.dataset.sur = '1';
+          oublier.textContent = 'Oublier ?';
+          return;
+        }
+        const liste = lireVariantes();
+        liste.splice(k, 1);
+        ecrireVariantes(liste);
+        dessiner();
+      });
+      ligneV.append(charger, oublier);
+      communes.append(ligneV);
+    }
+    contenu.append(communes);
     for (const groupe of reglages.fichier.groupes) {
       const membres = reglages.liste().filter((d) => d.groupe === groupe.id);
       if (membres.length === 0) continue;

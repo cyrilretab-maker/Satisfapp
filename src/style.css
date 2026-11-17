@@ -39,7 +39,7 @@ h1 { margin: 0; font-weight: 600; }
   padding: 14px 18px;
   text-decoration: none;
 }
-.gros-bouton { font-size: 1.3rem; padding: 26px 18px; text-align: center; display: block; }
+.gros-bouton { font-size: 1.3rem; padding: 26px 18px; text-align: center; display: block; min-width: 220px; box-sizing: border-box; }
 .gros-bouton:active, button:active { background: #3a3a3a; }
 
 /* Coin caché qui ouvre les réglages (trois appuis rapides) */
@@ -93,6 +93,8 @@ h1 { margin: 0; font-weight: 600; }
 .reglage input[type='range'] { width: 100%; height: 32px; pointer-events: none; display: block; }
 .reglage input[type='checkbox'] { width: 26px; height: 26px; }
 .panneau-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.panneau-variante { display: flex; gap: 8px; }
+.panneau-variante button:first-child { flex: 1; text-align: left; }
 .reglage-note { color: var(--gris); font-size: 0.8em; }
 .reglage-choix { display: flex; gap: 8px; }
 .reglage-choix button { flex: 1; padding: 10px; }
