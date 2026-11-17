@@ -8,6 +8,7 @@ Chaque session repart d'ici. Le plus récent en haut.
 - **Lots 0 à 5 : construits d'une traite à la demande de Cyril (2026-11-17), testés automatiquement, en ligne. En attente de son test au doigt.**
   - [ ] Lot 0 : on passe du bouchon à l'eau depuis l'écran de choix ; le bouchon fonctionne toujours (vérifié dans le navigateur).
   - [ ] Lot 1 : un tracé lent relie deux flaques, un tracé trop rapide coupe la route, Cyril reconnaît la route qui s'élargit.
+    - 2026-11-17 : Cyril : « c'est super, l'eau suit bien le doigt ». Restent à confirmer : la coupure par la vitesse, la route qui s'élargit, les lots 2 à 5.
   - [ ] Lot 2 : toute l'eau peut être menée au rebord ; la goutte tient jusqu'au toucher, puis se vide d'un coup.
   - [ ] Lot 3 : Cyril sent une flaque se vider dans une autre, les yeux fermés.
   - [ ] Lot 4 : l'écran rappelle un vrai égouttoir mouillé.
